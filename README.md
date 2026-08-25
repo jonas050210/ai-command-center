@@ -73,6 +73,7 @@ ai-command-center/
 ├── start.py                # cross-platform launcher (uses .venv if present)
 ├── setup.py                # idempotent first-run setup
 ├── test_overall.py         # 4-suite system test (backend, ts-check, build, e2e)
+├── tools/export_source.py  # full-source snapshot generator (→ FULLSOURCE.md)
 ├── requirements.txt · pytest.ini · .env.example · ROADMAP
 ├── backend/app/
 │   ├── config.py           # Settings (env/.env) + APP_VERSION — single source of truth
