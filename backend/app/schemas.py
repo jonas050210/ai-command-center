@@ -109,6 +109,48 @@ class ResearchQueryRequest(BaseModel):
     provider: str | None = None
 
 
+class GitPathRequest(BaseModel):
+    path: str | None = Field(default=".", max_length=300)
+
+
+class GitInitRequest(BaseModel):
+    path: str | None = Field(default=".", max_length=300)
+
+
+class GitBranchCreateRequest(BaseModel):
+    path: str | None = Field(default=".", max_length=300)
+    name: str = Field(min_length=1, max_length=100)
+
+
+class GitCommitRequest(BaseModel):
+    path: str | None = Field(default=".", max_length=300)
+    message: str = Field(min_length=1, max_length=500)
+    files: list[str] | None = Field(default=None, max_length=200)
+
+
+class GitPushRequest(BaseModel):
+    path: str | None = Field(default=".", max_length=300)
+    remote: str = Field(default="origin", max_length=60)
+    set_upstream: bool = False
+
+
+class GitRemoteAddRequest(BaseModel):
+    path: str | None = Field(default=".", max_length=300)
+    url: str = Field(min_length=1, max_length=300)
+    remote: str = Field(default="origin", max_length=60)
+
+
+class GithubTokenRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=300)
+
+
+class GithubRepoCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100,
+                      pattern="^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
+    private: bool = True
+    description: str = Field(default="", max_length=350)
+
+
 class AgentStopRequest(BaseModel):
     run_id: str
 

@@ -212,7 +212,7 @@ export function SettingsDrawer() {
             {capToggle("cap_network_fetch", "Network fetch",
               "web_search / web_fetch + Research Mode. SSRF-guarded, read-only.")}
             {capToggle("cap_git_operate", "Git operations",
-              "Branches/commits/push via the Git integration (P7) — off by default.")}
+              "git init/branch/commit/push in the workspace sandbox — audited, opt-in.")}
           </div>
 
           {/* model defaults */}

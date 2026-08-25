@@ -61,17 +61,12 @@ async def test_providers_endpoint(api):
     assert ollama["status"] == "running"
 
 
-async def test_future_features_return_501_not_implemented(api):
-    # Agent/Projects/Compare/Team/Research graduated to real implementations
-    # (P3/P4/P5/P6) — only git must still 501.
-    for path in ("/api/git/status",):
-        r = await api.client.get(path)
-        assert r.status_code == 501, path
-        body = r.json()
-        assert body["error"]["code"] == "NOT_IMPLEMENTED"
-        assert "NOT IMPLEMENTED" in body["error"]["message"]
-        r2 = await api.client.post(path, json={})
-        assert r2.status_code == 501
+async def test_no_future_boundaries_left(api):
+    # Every roadmap feature is real since P7 — no NOT_IMPLEMENTED stubs remain.
+    # The git status endpoint answers honestly (NOT_A_REPO in the test workspace).
+    r = await api.client.get("/api/git/status")
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "GIT_NOT_A_REPO"
 
 
 async def test_research_graduated_from_501(api):

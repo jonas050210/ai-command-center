@@ -6,7 +6,7 @@ Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Pytho
 
 ---
 
-## What works today (Phases 0–6, fully implemented, tests passing)
+## What works today (Phases 0–7, fully implemented, tests passing)
 
 | Area | Capabilities |
 |---|---|
@@ -20,9 +20,10 @@ Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Pytho
 | **Research Mode** | Web-grounded answers with numbered citations: DuckDuckGo search → **SSRF-guarded** fetch (private/loopback/link-local blocked, redirect chain re-validated, hard size caps, page text honestly marked truncated) → answer pass with `[n]` citations. Sources that fail are dropped *and said so*; if nothing could be read, the run fails instead of hallucinating. Runs persist to history. The same web layer powers the agent's `web_search`/`web_fetch` tools (READ-tier, `network:fetch` capability) |
 | **Token tracking** | Input / output / total — always labeled **exact** or **estimated**. Per message, conversation, model card and session |
 | **€0 CostGuard** | `FREE_ONLY=true`, `MAX_SPEND=0.00` by default. Paid requests are **blocked server-side before any network call**: *"Paid model blocked. Free-only mode is enabled. No money was spent."* Tested against request-body bypass attempts |
-| **Security** | Fernet-encrypted credentials, workspace path-containment sandbox (blocks `../`, `..\\`, UNC), deny-by-default capability policy (`filesystem:read/write`, `command:execute`, `network:fetch` on · `git:operate` reserved), tool execution audit log, security headers, host/origin guard, API-token middleware, rate limiting, JSON logs with rotation + secret redaction |
+| **Git / GitHub** | Local git inside the workspace sandbox: status (staged/untracked/modified), diff (capped, honest truncation), log, branches (create+switch, validated names), commit (repo identity or honest fallback), push (+set-upstream; HTTPS via GIT_ASKPASS with the token **never in argv/logs** and **only ever to github.com**), remote add (github https/ssh + local). GitHub REST: user, repos, create-private-repo — PAT vault-encrypted, masked everywhere. Mutations need the `git:operate` capability (off by default) and every operation is audited. Destructive ops (reset --hard, force-push, clean) are deliberately not offered |
+| **Security** | Fernet-encrypted credentials, workspace path-containment sandbox (blocks `../`, `..\\`, UNC), deny-by-default capability policy (`filesystem:read/write`, `command:execute`, `network:fetch` on by default · `git:operate` opt-in), tool execution audit log, security headers, host/origin guard, API-token middleware, rate limiting, JSON logs with rotation + secret redaction |
 
-**Honestly marked NOT IMPLEMENTED** (HTTP 501 at its API boundary, badge in the UI): **Git/GitHub integration** (Phase 7).
+**Every roadmap feature is real.** No view shows fake functionality; API boundaries that used to answer HTTP 501 are all implemented.
 
 ## Quick start
 
@@ -55,7 +56,7 @@ python start.py          # → http://127.0.0.1:8000
 | `DATA_DIR` | `./data` | SQLite, logs, encrypted key, workspace |
 | `LOG_LEVEL` | `INFO` | JSON logs at `data/logs/app.log` |
 
-FREE_ONLY / MAX_SPEND / default model / num_ctx / custom instructions / agent capability toggles (`network:fetch` on by default since Research Mode shipped; `git:operate` reserved off) can be changed at runtime (Settings drawer) — persisted in SQLite, **enforced only in the backend**.
+FREE_ONLY / MAX_SPEND / default model / num_ctx / custom instructions / agent capability toggles (network:fetch on by default, git:operate opt-in) can be changed at runtime (Settings drawer) — persisted in SQLite, **enforced only in the backend**.
 
 ## Architecture
 
@@ -77,17 +78,17 @@ ai-command-center/
 │   ├── agent/              # tool-calling engine (REAL) — max-steps, circuit breaker
 │   ├── team/               # planner/executor/reviewer pipelines (REAL)
 │   ├── research/           # web search/fetch layer (SSRF-guarded) + grounded Q&A (REAL)
-│   ├── gitops/             # Phase 7 boundary (HTTP 501, no fakes)
+│   ├── gitops/             # git subprocess service (sandboxed, audited) + GitHub REST
 │   ├── tools/              # registry · builtin (fs/shell/web) · gateway executor · audit
 │   ├── security/           # crypto vault · permission policy · guards · rate limit
 │   ├── workspace/          # path-containment sandbox
 │   ├── observability/      # JSON logging (rotation+redaction) · session metrics
 │   └── routers/            # health·system·settings·costs·providers·models·conversations
-│                           # chat·agent·projects·compare·team·research (SSE) · future(501)
+│                           # chat·agent·projects·compare·team·research (SSE) · git
 ├── frontend/               # React 18 · TypeScript (strict) · Vite · Tailwind v4
 │   └── src/                # store · api (REST + SSE) · views (chat/agent/compare/team/
 │                           # research/projects/models) · shared agent UI components
-└── tests/                  # 197 pytest tests (unit + API + SSE flows, all faked nets)
+└── tests/                  # 217 pytest tests (unit + API + SSE flows, all faked nets)
 ```
 
 **Data flow (any LLM call):** request → ModelRouter (explicit provider › synced catalog › default provider; *no cross-provider fallback*) → **CostGuard** (blocks paid/budget-breakers pre-network) → provider stream → exact token accounting → usage ledger → session metrics.
@@ -100,7 +101,7 @@ ai-command-center/
 
 ## API summary
 
-`GET /api/health` · `GET /api/system/status` · `GET|PUT /api/settings` · `GET /api/costs` · `GET /api/usage/tokens` · `GET /api/providers` (+key endpoints) · `GET /api/models` (+filters) · `POST /api/models/refresh|test|pull(SSE)` · favorites/delete · `GET|POST|PATCH|DELETE /api/conversations[/{id}]` · `POST /api/chat/completions|regenerate|stop (SSE)` · `POST /api/agent/runs (SSE)` + stop/history/approvals/capabilities/tools/executions · `GET|POST /api/projects` (+archive) · `POST /api/compare/runs (SSE)` · `GET|POST /api/team` + runs (SSE)/stop · `POST /api/research/query (SSE)` + history/detail/stop · `/api/git → 501`. Interactive docs at `/api/docs`.
+`GET /api/health` · `GET /api/system/status` · `GET|PUT /api/settings` · `GET /api/costs` · `GET /api/usage/tokens` · `GET /api/providers` (+key endpoints) · `GET /api/models` (+filters) · `POST /api/models/refresh|test|pull(SSE)` · favorites/delete · `GET|POST|PATCH|DELETE /api/conversations[/{id}]` · `POST /api/chat/completions|regenerate|stop (SSE)` · `POST /api/agent/runs (SSE)` + stop/history/approvals/capabilities/tools/executions · `GET|POST /api/projects` (+archive) · `POST /api/compare/runs (SSE)` · `GET|POST /api/team` + runs (SSE)/stop · `POST /api/research/query (SSE)` + history/detail/stop · `GET /api/git/status|log|diff|branches` · `POST /api/git/init|branches|commit|push|remote` · `/api/git/github/token|user|repos`. Interactive docs at `/api/docs`.
 
 ## Hardware notes (RTX 4060 Ti 8GB)
 

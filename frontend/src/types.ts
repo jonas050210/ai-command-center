@@ -329,3 +329,52 @@ export interface ResearchRunRow {
   created_at: string;
   updated_at: string;
 }
+
+// ── Git / GitHub ─────────────────────────────────────────────────────
+export interface GitFileStatus {
+  path: string;
+  x: string;
+  y: string;
+  staged: boolean;
+  untracked: boolean;
+}
+
+export interface GitStatus {
+  path: string;
+  branch: string;
+  ahead: number;
+  behind: number;
+  remote: string | null;
+  files: GitFileStatus[];
+  clean: boolean;
+}
+
+export interface GitCommitRow {
+  sha: string;
+  date: string;
+  author: string;
+  decorations: string;
+  message: string;
+}
+
+export interface GitBranchRow {
+  name: string;
+  current: boolean;
+}
+
+export interface GithubRepoRow {
+  name: string;
+  full_name: string;
+  private: boolean;
+  html_url: string;
+  default_branch: string;
+  clone_url: string;
+  updated_at: string;
+}
+
+export interface GithubUser {
+  login: string;
+  name: string | null;
+  avatar_url: string | null;
+  html_url: string | null;
+}

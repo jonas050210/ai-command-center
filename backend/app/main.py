@@ -36,6 +36,7 @@ from ..app.security.guards import (ApiTokenManager, ApiTokenMiddleware,
                                    HostOriginGuardMiddleware,
                                    SecurityHeadersMiddleware)
 from ..app.security.ratelimit import RateLimitMiddleware
+from ..app.gitops.service import GitService
 from ..app.services.chat_service import ChatService, RequestManager
 from ..app.services.compare_service import CompareService
 from ..app.services.cost_guard import CostGuard
@@ -84,6 +85,7 @@ class Services:
     compare: CompareService
     team: TeamService
     research: ResearchService
+    git: GitService
 
 
 def build_services(settings: Settings) -> Services:
@@ -140,12 +142,16 @@ def build_services(settings: Settings) -> Services:
     research = ResearchService(
         repo=ResearchRepo(db), usage=usage_repo, router=router, guard=guard,
         settings=settings_service, run_manager=ResearchRunManager())
+    git = GitService(executions=executions_repo,
+                     workspace_root=settings.resolved_workspace_root,
+                     data_dir=settings.data_dir, settings=settings_service)
 
     return Services(
         settings=settings, db=db, vault=vault,
         credentials_service=credentials_service,
         tools=tools, executor=executor, agent=agent,
         projects=projects, compare=compare, team=team, research=research,
+        git=git,
         settings_repo=settings_repo, providers_repo=providers_repo,
         models_repo=models_repo, conversations_repo=conversations_repo,
         messages_repo=messages_repo, usage_repo=usage_repo,
@@ -202,7 +208,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await call_next(request)
 
     from ..app.routers import (agent as agent_router, chat, compare, conversations,
-                               costs, future, health, models, projects, providers,
+                               costs, git, health, models, projects, providers,
                                research, settings as settings_router, system, team)
 
     app.include_router(health.router, prefix="/api")
@@ -218,7 +224,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(compare.router, prefix="/api")
     app.include_router(team.router, prefix="/api")
     app.include_router(research.router, prefix="/api")
-    app.include_router(future.router, prefix="/api")
+    app.include_router(git.router, prefix="/api")
 
     # ── frontend (production build) with SPA fallback ────────────────
     dist = settings.frontend_dist

@@ -248,10 +248,11 @@ def run_system_tests() -> bool:
         record("chat stop endpoint (404 for unknown id)",
                code == 404 and json.loads(stop)["error"]["code"] == "REQUEST_NOT_FOUND")
 
-        code, future = http("GET", "/api/git/status")
-        body = json.loads(future)
-        record("future features: 501 NOT IMPLEMENTED",
-               code == 501 and body["error"]["code"] == "NOT_IMPLEMENTED")
+        code, gitbody = http("GET", "/api/git/status")
+        record("git integration real (honest NOT_A_REPO in bare workspace)",
+               code in (200, 400)
+               and (code == 200 or json.loads(gitbody)["error"]["code"]
+                    == "GIT_NOT_A_REPO"))
 
         if (ROOT / "frontend" / "dist" / "index.html").exists():
             code, html = http("GET", "/")

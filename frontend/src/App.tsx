@@ -8,10 +8,10 @@ import { AgentView } from "./components/AgentView";
 import { CompareView } from "./components/CompareView";
 import { TeamView } from "./components/TeamView";
 import { ResearchView } from "./components/ResearchView";
+import { GitView } from "./components/GitView";
 import { ProjectsView } from "./components/ProjectsView";
 import { ModelCenter } from "./components/ModelCenter";
 import { SettingsDrawer } from "./components/SettingsDrawer";
-import { NotImplemented } from "./components/NotImplemented";
 
 function Toasts() {
   const { toasts } = useStore();
@@ -39,10 +39,9 @@ export default function App() {
           {view === "compare" && <CompareView />}
           {view === "team" && <TeamView />}
           {view === "research" && <ResearchView />}
+          {view === "git" && <GitView />}
           {view === "projects" && <ProjectsView />}
           {view === "models" && <ModelCenter />}
-          {!["chat", "agent", "compare", "team", "research", "projects", "models"].includes(view)
-            && <NotImplemented view={view} />}
         </main>
         {rightOpen && view === "chat" && <RightInspector />}
       </div>

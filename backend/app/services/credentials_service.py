@@ -56,6 +56,8 @@ class CredentialsService:
             ciphertext = await self.repo.get_ciphertext(name)
             if not ciphertext:
                 continue
+            if name in self.NON_PROVIDER_SCOPES:
+                continue                      # generic secret, not a provider key
             try:
                 provider = self.registry.get(name)
             except Exception:
@@ -85,3 +87,35 @@ class CredentialsService:
             return mask_key(self.vault.decrypt(ciphertext))
         except Exception:
             return "stored (undecryptable — key changed?)"
+
+    # ── generic (non-provider) secrets — same vault, same table ──────
+    # e.g. the GitHub PAT: stored under scope "github", never wired into a
+    # model provider. load_into_providers() skips these silently.
+    NON_PROVIDER_SCOPES = frozenset({"github"})
+
+    async def set_secret(self, scope: str, value: str) -> dict:
+        if scope not in self.NON_PROVIDER_SCOPES:
+            raise ValueError(f"unknown secret scope '{scope}'")
+        key = value.strip()
+        await self.repo.upsert(scope, self.vault.encrypt(key))
+        log.info("stored %s secret (%s)", scope, mask_key(key))
+        return {"scope": scope, "configured": True, "masked": mask_key(key)}
+
+    async def get_secret(self, scope: str) -> str | None:
+        if scope not in self.NON_PROVIDER_SCOPES:
+            raise ValueError(f"unknown secret scope '{scope}'")
+        ciphertext = await self.repo.get_ciphertext(scope)
+        if not ciphertext:
+            return None
+        try:
+            return self.vault.decrypt(ciphertext)
+        except Exception:
+            log.error("could not decrypt %s secret", scope)
+            return None
+
+    async def delete_secret(self, scope: str) -> dict:
+        if scope not in self.NON_PROVIDER_SCOPES:
+            raise ValueError(f"unknown secret scope '{scope}'")
+        await self.repo.delete(scope)
+        log.info("removed %s secret", scope)
+        return {"scope": scope, "configured": False}

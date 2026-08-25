@@ -10,8 +10,8 @@ import {
   TrashIcon, UsersIcon, XIcon,
 } from "../icons";
 
-function NavItem({ view, icon, label, soon }: {
-  view: View; icon: React.ReactNode; label: string; soon?: boolean;
+function NavItem({ view, icon, label }: {
+  view: View; icon: React.ReactNode; label: string;
 }) {
   const { view: active, setView } = useStore();
   return (
@@ -20,12 +20,10 @@ function NavItem({ view, icon, label, soon }: {
       className={cx(
         "w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[12.5px] transition-all",
         active === view ? "bg-accentdim text-accent border border-[rgba(69,227,255,0.22)]"
-          : soon ? "text-faint hover:text-dim hover:bg-hover border border-transparent"
-            : "text-dim hover:text-ink hover:bg-hover border border-transparent")}
+          : "text-dim hover:text-ink hover:bg-hover border border-transparent")}
     >
       <span className="shrink-0 opacity-90">{icon}</span>
       <span className="flex-1 text-left font-medium">{label}</span>
-      {soon && <span className="chip chip-warn !text-[8.5px] !px-1.5 !py-[1px]">NOT IMPLEMENTED</span>}
     </button>
   );
 }
@@ -161,7 +159,7 @@ export function LeftSidebar() {
           <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" />
           <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" />
           <NavItem view="projects" icon={<FolderIcon className="w-4 h-4" />} label="Projects" />
-          <NavItem view="git" icon={<GitIcon className="w-4 h-4" />} label="Git / GitHub" soon />
+          <NavItem view="git" icon={<GitIcon className="w-4 h-4" />} label="Git / GitHub" />
         </nav>
       </div>
 
