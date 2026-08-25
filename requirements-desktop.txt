@@ -1,0 +1,4 @@
+# Desktop packaging only (NOT needed to run the app from source).
+# pip install -r requirements.txt -r requirements-desktop.txt
+pyinstaller==6.11.1
+pywebview==5.4

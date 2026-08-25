@@ -23,6 +23,7 @@ Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Pytho
 | **Memory & Skills** | Persistent memory (survives runs, labeled in the prompt): user CRUD in Settings, agent `memory_search/save/forget` tools gated by the `memory` capability (saves are approval-gated + audited, source provenance kept). `AGENT.md` standing instructions chain workspace→project into every run's prompt, inspectable via `/api/memory/context` |
 | **Git / GitHub** | Local git inside the workspace sandbox: status (staged/untracked/modified), diff (capped, honest truncation), log, branches (create+switch, validated names), commit (repo identity or honest fallback), push (+set-upstream; HTTPS via GIT_ASKPASS with the token **never in argv/logs** and **only ever to github.com**), remote add (github https/ssh + local). GitHub REST: user, repos, create-private-repo — PAT vault-encrypted, masked everywhere. Mutations need the `git:operate` capability (off by default) and every operation is audited. Destructive ops (reset --hard, force-push, clean) are deliberately not offered |
 | **Security** | Fernet-encrypted credentials, workspace path-containment sandbox (blocks `../`, `..\\`, UNC), deny-by-default capability policy (`filesystem:read/write`, `command:execute`, `network:fetch` on by default · `git:operate` opt-in), tool execution audit log, security headers, host/origin guard, API-token middleware, rate limiting, JSON logs with rotation + secret redaction |
+| **Windows distribution** | Professional desktop build: PyInstaller onedir (`desktop/aicc_desktop.spec`) with the SPA bundled, native window via pywebview (browser fallback), portable data dir beside the EXE (falls back to `%LOCALAPPDATA%`), deterministic `--smoke` self-check, Inno Setup installer (`desktop/installer.iss`), and a tag-triggered GitHub Actions release pipeline (`.github/workflows/release.yml`) that runs the full test suite before it ever builds |
 
 **Every roadmap feature is real.** No view shows fake functionality; API boundaries that used to answer HTTP 501 are all implemented.
 
@@ -89,8 +90,22 @@ ai-command-center/
 ├── frontend/               # React 18 · TypeScript (strict) · Vite · Tailwind v4
 │   └── src/                # store · api (REST + SSE) · views (chat/agent/compare/team/
 │                           # research/projects/models) · shared agent UI components
-└── tests/                  # 228 pytest tests (unit + API + SSE flows, all faked nets)
+├── desktop/                # desktop launcher · PyInstaller spec · Inno Setup installer
+│                           # · build driver (npm build → PyInstaller onedir)
+└── tests/                  # 239 pytest tests (unit + API + SSE flows, all faked nets)
 ```
+
+## Windows desktop app (EXE + installer)
+
+```powershell
+# one-time extras
+pip install -r requirements-desktop.txt        # pyinstaller, pywebview
+
+python desktop/build.py                        # → dist-desktop\AICommandCenter\AICommandCenter.exe
+iscc desktop\installer.iss                     # → dist-installer\AICommandCenterSetup-<version>.exe
+```
+
+The EXE embeds the built frontend and backend; on first start it opens a native window (or your browser), keeps its data beside the EXE when the folder is writable (portable install) or in `%LOCALAPPDATA%\AICommandCenter` otherwise, and migrates its own database. `AICommandCenter.exe --smoke` runs a deterministic health self-check (exit 0 = healthy). Tagging `v*` on GitHub builds and publishes the installer automatically (tests gate the build).
 
 **Data flow (any LLM call):** request → ModelRouter (explicit provider › synced catalog › default provider; *no cross-provider fallback*) → **CostGuard** (blocks paid/budget-breakers pre-network) → provider stream → exact token accounting → usage ledger → session metrics.
 

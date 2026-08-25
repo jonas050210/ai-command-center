@@ -9,6 +9,7 @@ Precedence: real environment variables > ``.env`` file > defaults below.
 from __future__ import annotations
 
 import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -18,7 +19,47 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # App version is defined EXACTLY ONCE (here).
-APP_VERSION = "0.10.0"
+APP_VERSION = "0.11.0"
+
+
+# ── desktop / frozen app (PyInstaller onedir, P9) ────────────────────
+def is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def bundle_root() -> Path:
+    """Read-only resources root: PyInstaller's _MEIPASS, else repo root."""
+    if is_frozen():
+        return Path(getattr(sys, "_MEIPASS", PROJECT_ROOT))
+    return PROJECT_ROOT
+
+
+def default_data_dir() -> Path:
+    """Data-dir priority: explicit DATA_DIR env (pydantic-settings already
+    handles that) → frozen: exe-adjacent ``data/`` when writable (portable
+    install) else ``%LOCALAPPDATA%/AICommandCenter`` → dev: repo ``data/``.
+    """
+    if not is_frozen():
+        return PROJECT_ROOT / "data"
+    exe_dir = Path(sys.executable).resolve().parent
+    candidate = exe_dir / "data"
+    try:
+        candidate.mkdir(parents=True, exist_ok=True)
+        probe = candidate / ".write_probe"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink()
+        return candidate
+    except OSError:
+        base = os.environ.get("LOCALAPPDATA")
+        root = (Path(base) if base
+                else Path.home() / "AppData" / "Local") / "AICommandCenter"
+        return root
+
+
+def _env_file() -> Path:
+    if is_frozen():
+        return Path(sys.executable).resolve().parent / ".env"
+    return PROJECT_ROOT / ".env"
 
 # The default model is defined EXACTLY ONCE (here). The rest of the app
 # always reads settings.default_model or the runtime settings table.
@@ -29,7 +70,7 @@ class Settings(BaseSettings):
     """Environment configuration (env vars are case-insensitive)."""
 
     model_config = SettingsConfigDict(
-        env_file=str(PROJECT_ROOT / ".env"),
+        env_file=str(_env_file()),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -41,8 +82,8 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
 
-    # storage
-    data_dir: Path = PROJECT_ROOT / "data"
+    # storage — see default_data_dir() for frozen-app resolution
+    data_dir: Path = Field(default_factory=default_data_dir)
     log_level: str = "INFO"
 
     # ollama
@@ -105,7 +146,7 @@ class Settings(BaseSettings):
 
     @property
     def frontend_dist(self) -> Path:
-        return PROJECT_ROOT / "frontend" / "dist"
+        return bundle_root() / "frontend" / "dist"
 
     @property
     def resolved_workspace_root(self) -> Path:
