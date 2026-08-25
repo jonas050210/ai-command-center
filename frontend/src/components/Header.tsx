@@ -17,17 +17,17 @@ export function Header() {
   const loaded = ollama?.loaded ?? [];
 
   return (
-    <header className="glass flex items-center gap-2 px-3 h-[52px] shrink-0 border-x-0 border-t-0"
+    <header className="glass hud-header flex items-center gap-2 px-3 h-[54px] shrink-0 border-x-0 border-t-0"
       style={{ borderRadius: 0 }}>
       <button className="icon-btn" onClick={toggleLeft} title={leftOpen ? "Collapse sidebar" : "Expand sidebar"}>
         {leftOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
       </button>
 
       <div className="flex items-center gap-2.5 text-accent select-none">
-        <LogoIcon />
+        <span className="logo-glow"><LogoIcon /></span>
         <div className="leading-none">
-          <div className="text-[13px] font-bold tracking-[0.18em] text-ink">AI COMMAND CENTER</div>
-          <div className="text-[9.5px] tracking-[0.22em] text-faint mt-[3px]">LOCAL-FIRST AI WORKSPACE</div>
+          <div className="font-display text-[13.5px] font-bold tracking-[0.14em] text-ink">AI COMMAND CENTER</div>
+          <div className="text-[9px] tracking-[0.28em] text-faint mt-[3px] font-mono">LOCAL · €0 · SANDBOXED</div>
         </div>
       </div>
 
@@ -45,6 +45,7 @@ export function Header() {
 
       <div className="flex-1" />
 
+      <div className="hud-scroll hidden sm:flex items-center gap-2 max-w-[46vw] pr-1">
       {/* Ollama status */}
       <div className="chip" title={ollama?.detail ?? `Ollama @ ${ollama?.host ?? "Unknown"}`}>
         <span className={`inline-block w-[7px] h-[7px] rounded-full ${running ? "bg-good" : "bg-bad pulse-soft"}`} />
@@ -102,6 +103,7 @@ export function Header() {
         <span className="text-faint">·</span>
         <span className="text-faint">Total</span>
         <span className="text-ink font-semibold">{formatEuro(costs?.total ?? 0, costs?.currency)}</span>
+      </div>
       </div>
 
       <button className="icon-btn" onClick={() => setSettingsOpen(true)} title="Settings">

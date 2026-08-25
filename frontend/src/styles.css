@@ -19,7 +19,8 @@
   --color-bad: #f87171;
   --font-sans: "Inter", "SF Pro Display", -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+  --font-display: "Syne", "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
 }
 
 html, body, #root {
@@ -55,16 +56,42 @@ body {
 
 /* ── glass surfaces ─────────────────────────────────────────── */
 .glass {
-  background: linear-gradient(180deg, rgba(16, 22, 32, 0.72), rgba(10, 14, 21, 0.82));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: linear-gradient(180deg, rgba(16, 22, 32, 0.78), rgba(10, 14, 21, 0.88));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--color-line);
 }
 .glass-soft {
-  background: rgba(14, 20, 29, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(14, 20, 29, 0.58);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--color-line);
+}
+.hud-header {
+  position: relative;
+  box-shadow: inset 0 -1px 0 rgba(69, 227, 255, 0.12);
+}
+.hud-header::after {
+  content: "";
+  position: absolute; left: 8%; right: 8%; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(69, 227, 255, 0.55), transparent);
+  pointer-events: none;
+}
+.logo-glow {
+  filter: drop-shadow(0 0 8px rgba(69, 227, 255, 0.45));
+}
+.view-stage { animation: viewIn 0.28s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.nav-item { position: relative; }
+.nav-item[data-active="1"]::before {
+  content: "";
+  position: absolute; left: 0; top: 6px; bottom: 6px; width: 2px;
+  border-radius: 99px;
+  background: var(--color-accent);
+  box-shadow: 0 0 10px rgba(69, 227, 255, 0.7);
 }
 .hover-glow { transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease; }
 .hover-glow:hover { border-color: rgba(69, 227, 255, 0.25); }
@@ -116,11 +143,12 @@ body {
 .btn:hover { border-color: rgba(69, 227, 255, 0.4); background: rgba(69, 227, 255, 0.07); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-accent {
-  background: linear-gradient(135deg, rgba(69, 227, 255, 0.16), rgba(69, 227, 255, 0.08));
-  border-color: rgba(69, 227, 255, 0.35);
+  background: linear-gradient(135deg, rgba(69, 227, 255, 0.2), rgba(69, 227, 255, 0.08));
+  border-color: rgba(69, 227, 255, 0.42);
   color: var(--color-accent);
+  box-shadow: 0 0 0 1px rgba(69, 227, 255, 0.06), 0 8px 22px rgba(69, 227, 255, 0.06);
 }
-.btn-accent:hover { background: rgba(69, 227, 255, 0.18); }
+.btn-accent:hover { background: rgba(69, 227, 255, 0.22); box-shadow: 0 0 18px rgba(69, 227, 255, 0.12); }
 .btn-danger:hover { border-color: rgba(248, 113, 113, 0.5); background: rgba(248, 113, 113, 0.08); color: var(--color-bad); }
 .btn-ghost { border-color: transparent; background: transparent; color: var(--color-dim); }
 .btn-ghost:hover { color: var(--color-ink); background: rgba(148, 163, 184, 0.08); border-color: transparent; }
@@ -345,8 +373,27 @@ body {
 :focus-visible { outline: 2px solid rgba(69, 227, 255, 0.45); outline-offset: 1px; }
 .icon-btn:focus-visible, .btn:focus-visible { outline-offset: 0; }
 
+.hero-ring {
+  position: relative;
+  width: 86px; height: 86px; border-radius: 50%;
+  display: grid; place-items: center;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(69, 227, 255, 0.16), transparent 62%),
+    rgba(10, 14, 21, 0.7);
+  border: 1px solid rgba(69, 227, 255, 0.28);
+  box-shadow: 0 0 40px rgba(69, 227, 255, 0.12), inset 0 0 24px rgba(69, 227, 255, 0.06);
+}
+.hero-ring::before {
+  content: "";
+  position: absolute; width: 110px; height: 110px; border-radius: 50%;
+  border: 1px dashed rgba(69, 227, 255, 0.22);
+  animation: spinSlow 22s linear infinite;
+}
+@keyframes spinSlow { to { transform: rotate(360deg); } }
+
 @media (prefers-reduced-motion: reduce) {
-  .anim-fade-up, .anim-fade-in, .stream-caret, .pulse-soft, .skeleton {
+  .anim-fade-up, .anim-fade-in, .stream-caret, .pulse-soft, .skeleton,
+  .ambient-aurora, .view-stage, .hero-ring::before {
     animation: none !important;
   }
   * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }

@@ -4,7 +4,7 @@
 what it is, what it does, how it is built, file by file, exactly how it was
 verified, what it cost to build (€0 infra, local-first), and its honest limits.
 
-- **Version:** 0.14.0 · **Status:** all roadmap phases P0–P12 complete
+- **Version:** 0.15.0 · **Status:** all roadmap phases P0–P13 complete
 - **Tests:** pytest + frontend `tsc --noEmit` + production build — see test_overall.py ·
   production build clean · live end-to-end smokes 19/19 + 21/21 + 14/14
 - **Repo:** `jonas050210/ai-command-center` · branch of record: this session's

@@ -17,8 +17,9 @@ function NavItem({ view, icon, label }: {
   return (
     <button
       onClick={() => setView(view)}
+      data-active={active === view ? "1" : "0"}
       className={cx(
-        "w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[12.5px] transition-all",
+        "nav-item w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[12.5px] transition-all",
         active === view ? "bg-accentdim text-accent border border-[rgba(69,227,255,0.22)]"
           : "text-dim hover:text-ink hover:bg-hover border border-transparent")}
     >
@@ -156,21 +157,24 @@ export function LeftSidebar() {
     <aside className="glass border-y-0 border-l-0 w-[276px] shrink-0 flex flex-col min-h-0"
       style={{ borderRadius: 0 }}>
       <div className="p-3 pb-2 space-y-2">
-        <div className="micro-label px-1">Workspace</div>
+        <div className="micro-label px-1">Deck</div>
         <button className="btn btn-accent w-full justify-center !py-2"
           onClick={() => { setActiveId(null); setView("chat"); }}>
           <PlusIcon className="w-3.5 h-3.5" /> New chat
         </button>
         <nav className="space-y-[2px] pt-1">
+          <div className="micro-label px-1 pt-1 pb-0.5">Core</div>
           <NavItem view="chat" icon={<ChatIcon className="w-4 h-4" />} label="Chat" />
-          <NavItem view="models" icon={<ModelsIcon className="w-4 h-4" />} label="Model Center" />
-          <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" />
           <NavItem view="coder" icon={<CodeIcon className="w-4 h-4" />} label="Coder Mode" />
-          <NavItem view="compare" icon={<GaugeIcon className="w-4 h-4" />} label="Compare Mode" />
-          <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" />
-          <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" />
+          <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" />
+          <NavItem view="models" icon={<ModelsIcon className="w-4 h-4" />} label="Model Center" />
+          <div className="micro-label px-1 pt-2.5 pb-0.5">Ops</div>
           <NavItem view="projects" icon={<FolderIcon className="w-4 h-4" />} label="Projects" />
           <NavItem view="git" icon={<GitIcon className="w-4 h-4" />} label="Git / GitHub" />
+          <div className="micro-label px-1 pt-2.5 pb-0.5">Labs</div>
+          <NavItem view="compare" icon={<GaugeIcon className="w-4 h-4" />} label="Compare" />
+          <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team" />
+          <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" />
         </nav>
       </div>
 

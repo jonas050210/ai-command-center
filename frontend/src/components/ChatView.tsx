@@ -226,10 +226,10 @@ export function ChatView() {
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto min-h-0 py-4">
         {isNew && messages.length === 0 && !stream && (
           <div className="h-full flex flex-col items-center justify-center px-6 text-center anim-fade-up">
-            <div className="text-accent mb-5 opacity-90"><LogoIcon className="scale-[2.2]" /></div>
-            <h1 className="text-[19px] font-bold tracking-wide">AI Command Center</h1>
+            <div className="hero-ring text-accent mb-6"><LogoIcon className="scale-[1.35]" /></div>
+            <h1 className="font-display text-[22px] font-bold tracking-[0.08em]">AI Command Center</h1>
             <p className="text-[12.5px] text-dim mt-1.5 max-w-[430px]">
-              Premium local-first AI chat. Real streaming from Ollama — nothing is simulated.
+              Local-first command deck. Real streaming from Ollama — nothing is simulated.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
               <span className="chip chip-good"><ShieldIcon className="w-3 h-3" /> FREE-ONLY · €0.00</span>

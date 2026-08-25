@@ -1,8 +1,8 @@
 ; Inno Setup — AI Command Center installer.
 ; Builds AICommandCenterSetup-<version>.exe from the PyInstaller onedir output.
-; Compile:  iscc /DAppVersion=0.14.0 desktop/installer.iss
+; Compile:  iscc /DAppVersion=0.15.0 desktop/installer.iss
 #ifndef AppVersion
-  #define AppVersion "0.14.0"
+  #define AppVersion "0.15.0"
 #endif
 #define AppName "AI Command Center"
 #define AppExe "AICommandCenter.exe"

@@ -304,7 +304,7 @@ export function CoderView() {
       <div className="px-5 pt-3.5 pb-2.5 border-b border-line space-y-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <CodeIcon className="w-[18px] h-[18px] text-accent" />
-          <span className="text-[15px] font-bold">Coder Mode</span>
+          <span className="font-display text-[16px] font-bold tracking-wide">Coder Mode</span>
           <span className="chip chip-good !text-[9px]"><ShieldIcon className="w-3 h-3" /> same sandbox · same approvals</span>
           <span className="chip !text-[9px]" title={profile?.note}>Ollama runtime · 8k ctx</span>
           <div className="ml-auto flex items-center gap-2">

@@ -106,7 +106,7 @@ export function Composer({ streaming, onSend, onStop, modelOverride }: {
         </div>
       )}
 
-      <div className="glass rounded-2xl p-2.5 focus-within:border-[rgba(69,227,255,0.4)] transition-colors">
+      <div className="glass rounded-2xl p-2.5 focus-within:border-[rgba(69,227,255,0.55)] focus-within:shadow-[0_0_0_1px_rgba(69,227,255,0.12),0_16px_40px_rgba(69,227,255,0.06)] transition-all">
         <textarea
           ref={ref}
           className="w-full bg-transparent resize-none outline-none text-[13.5px] leading-relaxed

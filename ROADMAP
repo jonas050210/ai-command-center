@@ -80,6 +80,11 @@ PHASE 10 — FINAL POLISH ............................... DONE (v0.12.0)
     - Sidebar date grouping, chat day separators, jump-to-latest,
       message timestamps, focus/selection/reduced-motion polish
 
+PHASE 13 — COMMAND DECK UI ............................ DONE (v0.15.0)
+    - Ambient aurora + grid HUD, display type, grouped nav
+    - Header overflow scroll, view-stage transitions, hero ring
+    - Reduced-motion still honored
+
 PHASE 12 — REAL-REPO CODER ............................ DONE (v0.14.0)
     - Attach an existing folder (link, never copy; archive never deletes)
     - Coder runs auto-inject capped tree + git status
