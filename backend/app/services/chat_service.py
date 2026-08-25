@@ -19,6 +19,7 @@ from ..core.errors import BadRequest, NotFound
 from ..db.repo import (ConversationsRepo, MessagesRepo, ModelsRepo, UsageRepo)
 from ..observability.metrics import metrics
 from ..providers.base import ChatMessage, ChatOptions
+from .context import compact_messages, effective_num_ctx, summarize_middle
 from .cost_guard import CostGuard
 from .model_router import ModelRouter
 from .settings_service import SettingsService
@@ -164,8 +165,15 @@ class ChatService:
                       auto_title: bool) -> AsyncIterator[dict[str, Any]]:
         request_id = uuid.uuid4().hex
         cancel = self.requests.start(request_id)
-        num_ctx = await self.settings.get_typed("num_ctx")
+        num_ctx = effective_num_ctx(await self.settings.get_typed("num_ctx"),
+                                    (model_row or {}).get("context_length"))
         keep_alive = await self.settings.get_typed("keep_alive")
+        # Context management (P2): compact long histories before they would
+        # overflow the effective window — summarized by the provider itself.
+        history, compacted = await compact_messages(
+            history, num_ctx,
+            summarize=lambda omitted: summarize_middle(provider, model, omitted,
+                                                       keep_alive))
         assistant = assistant_message or await self.messages.create(
             conversation["id"], "assistant", "", model=model,
             provider=provider.name, status="streaming")
@@ -175,7 +183,8 @@ class ChatService:
                "conversation_id": conversation["id"],
                "user_message_id": user_message["id"] if user_message else None,
                "assistant_message_id": assistant["id"],
-               "model": model, "provider": provider.name}
+               "model": model, "provider": provider.name,
+               "compacted": compacted}
 
         content_parts: list[str] = []
         final_in: int | None = None
@@ -231,7 +240,7 @@ class ChatService:
         metrics.session_input_tokens += final_in
         metrics.session_output_tokens += final_out
         metrics.session_cost_eur = round(metrics.session_cost_eur + cost, 8)
-        metrics.last_request_cost_eur = cost  # type: ignore[attr-defined]
+        metrics.last_request_cost_eur = cost
 
         if status == "error":
             yield {"type": "error", "code": "PROVIDER_ERROR", "message": error_text}

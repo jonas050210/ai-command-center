@@ -2,12 +2,13 @@
 import { useStore } from "../store";
 import { formatEuro } from "../utils";
 import {
-  ChevronLeftIcon, ChevronRightIcon, LogoIcon, SettingsIcon, ShieldIcon,
+  ChevronLeftIcon, ChevronRightIcon, LogoIcon, SearchIcon, SettingsIcon,
+  ShieldIcon,
 } from "../icons";
 
 export function Header() {
   const { system, costs, settings, leftOpen, rightOpen, toggleLeft, toggleRight,
-    setSettingsOpen } = useStore();
+    setSettingsOpen, setPaletteOpen } = useStore();
   const ollama = system?.ollama;
   const running = ollama?.status === "running";
   const freeOnly = settings?.free_only ?? true;
@@ -27,6 +28,18 @@ export function Header() {
         </div>
       </div>
 
+      {/* command palette trigger */}
+      <button
+        className="hidden md:flex items-center gap-2.5 ml-4 pl-3 pr-2 py-[5px] rounded-lg
+          border border-line2 bg-[rgba(7,10,16,0.55)] text-faint text-[11.5px]
+          hover:border-[rgba(69,227,255,0.35)] hover:text-dim transition-all min-w-[190px]"
+        onClick={() => setPaletteOpen(true)}
+        title="Command palette — navigate, search chats, switch models">
+        <SearchIcon className="w-3.5 h-3.5 shrink-0" />
+        <span className="flex-1 text-left">Commands, chats, models…</span>
+        <kbd className="kbd">Ctrl K</kbd>
+      </button>
+
       <div className="flex-1" />
 
       {/* Ollama status */}
@@ -40,6 +53,21 @@ export function Header() {
           <span className="text-faint">{ollama.latency_ms.toFixed(0)}ms</span>
         )}
       </div>
+
+      {/* Cloud providers (OpenRouter) — never silently active */}
+      {(system?.providers ?? []).filter((p) => !p.is_local).map((p) => {
+        const online = p.configured && p.last_status === "running";
+        return (
+          <div key={p.name} className="chip"
+            title={p.configured ? `${p.display_name} · ${p.last_status ?? "unknown"}` : `${p.display_name} · no API key stored`}>
+            <span className={`inline-block w-[7px] h-[7px] rounded-full ${online ? "bg-good" : "bg-warn"}`} />
+            <span>{p.name}</span>
+            <span className="text-ink font-semibold">
+              {p.configured ? (p.last_status === "running" ? "online" : p.last_status ?? "unknown") : "no key"}
+            </span>
+          </div>
+        );
+      })}
 
       {/* €0 protection */}
       <div className={`chip ${freeOnly ? "chip-good" : "chip-warn"}`}

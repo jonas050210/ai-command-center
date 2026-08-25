@@ -17,6 +17,7 @@ class Capability(str, Enum):
     COMMAND_EXECUTE = "command:execute"
     NETWORK_FETCH = "network:fetch"
     GIT_OPERATE = "git:operate"
+    MEMORY = "memory"
 
 
 # Commands future agents may never run (defense-in-depth on top of allowlist)

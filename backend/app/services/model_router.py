@@ -33,13 +33,18 @@ def parse_params_billions(parameter_size: str | None) -> float | None:
 
 
 def classify_model(name: str, families: list[str], capabilities: list[str],
-                   parameter_size: str | None) -> list[str]:
+                   parameter_size: str | None,
+                   is_local: bool = True, is_free: bool = True) -> list[str]:
     """Assign UI categories from real metadata (heuristic and honest —
     only derived from the model's actual name/families/capabilities)."""
     lname = name.lower()
     fams = {f.lower() for f in families}
     caps = {c.lower() for c in capabilities}
-    cats = {"general", "local", "free"}
+    cats = {"general"}
+    if is_local:
+        cats.add("local")
+    if is_free:
+        cats.add("free")
 
     if ("vision" in caps or "clip" in fams or "mllama" in fams
             or any(t in lname for t in ("llava", "vision", "-vl", "minicpm-v", "moondream"))):
@@ -70,10 +75,18 @@ class ModelRouter:
 
     async def resolve(self, provider_name: str | None,
                       model_name: str | None) -> tuple[Provider, str, dict | None]:
-        if not provider_name:
-            provider_name = self.registry.names()[0] if len(self.registry.names()) == 1 else "ollama"
-        provider = self.registry.get(provider_name)
         if not model_name:
             model_name = await self.settings.get_typed("default_model")
+        if not provider_name:
+            # Prefer the synced catalog: a model name that exists under
+            # exactly one provider resolves there (local preferred when the
+            # same name exists under several providers). Otherwise fall
+            # back to the configured default provider.
+            provider_name = await self.models.find_provider_for(model_name)
+        if not provider_name:
+            provider_name = await self.settings.get_typed("default_provider")
+            if provider_name not in self.registry.names() and self.registry.names():
+                provider_name = self.registry.names()[0]
+        provider = self.registry.get(provider_name)
         row = await self.models.get(provider_name, model_name)
         return provider, model_name, row

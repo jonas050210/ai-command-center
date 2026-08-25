@@ -1,14 +1,14 @@
 AI COMMAND CENTER — ROADMAP
 ================================================================
 
-PHASE 1 — FOUNDATION .................................... DONE (v0.3.0)
+PHASE 1 — FOUNDATION .................................. DONE (v0.3.0)
     FastAPI + SQLite (aiosqlite, async, migration-managed),
     modular boundaries (provider, model router, agent, team,
     workspace, tools, research, git, security, observability),
     env config, JSON structured logging, unified errors,
-    health checks, 15-table schema, encrypted credential vault.
+    health checks, schema versioning, encrypted credential vault.
 
-PHASE 2 — PREMIUM CHAT .................................. DONE (v0.3.0)
+PHASE 2 — PREMIUM CHAT ................................ DONE (v0.3.0)
     Real SSE streaming chat against Ollama; history, search,
     rename, delete, archive, pin, favorites; stop, retry,
     regenerate; markdown + GFM; syntax-highlighted code w/ copy;
@@ -16,44 +16,70 @@ PHASE 2 — PREMIUM CHAT .................................. DONE (v0.3.0)
     estimated token labels; context meter; error states; auto-
     titles from the local model. Zero simulated responses.
 
-PHASE 3 — MODEL CENTER + TOKEN/COST SYSTEM .............. DONE (v0.3.0)
+PHASE 3 — MODEL CENTER + TOKEN/COST SYSTEM ............ DONE (v0.3.0)
     Live Ollama discovery, categories, search/filter/sort,
     favorites, recently used, selection, speed tests, safe
     pull/delete. Per-model token/cost ledger. Strict €0
     CostGuard (FREE_ONLY, MAX_SPEND, pre-network blocking,
     no paid fallback) — tested against bypass attempts.
 
-PHASE 4 — AGENT MODE + PROJECTS ......................... NEXT
-    - Projects UI over existing tables (files, tasks, context)
-    - Agent engine behind the existing permission policy:
-      filesystem sandbox (workspace/), allow-listed commands,
-      every execution logged to executions
-    - Coding Workspace: read/edit/create files with diffs,
-      run tests, iterate — strictly inside the sandbox
-    - Compare Mode: run 2 models on the same prompt side-by-side
+PHASE 4 — AGENT MODE + PROJECTS ....................... DONE (v0.8.0)
+    - Tool-calling agent engine over SSE (fs_list/read/write/edit,
+      shell_run, later web_search/web_fetch/memory_*) with
+      max-steps, circuit breaker, cooperative stop
+    - Security gateway: capability check → arg validation →
+      HUMAN APPROVAL (10 min, exact diff preview) → sandboxed
+      execution → audit row (executions + agent_steps/approvals)
+    - Projects: slug-deduped sandboxed workspaces, archive-only
 
-PHASE 5 — TEAM MODE (FLAGSHIP) .......................... PLANNED
-    - 2–4 models: task intake → joint analysis → master plan
-    - Responsibility split by measured strengths (hooks in
-      models.measured_tps, capabilities, categories already exist)
-    - Shared project workspace, cross-review loops, test/fix cycles
-    - Per-member token accounting (schema ready):
-        MODEL A 8,214 · MODEL B 12,421 · TEAM TOTAL 20,635
-    - One deliverable with plan, code and verification report
+PHASE 5 — TEAM MODE (FLAGSHIP) ........................ DONE (v0.8.0)
+    - Planner → executor → reviewer pipelines of 2–4 models
+    - Executor turns are real agent runs (same gateway/audit)
+    - VERDICT parsing with exactly one revision; VRAM-serial locals
+    - Compare Mode shipped alongside: 2–4 models side-by-side,
+      queued-vs-parallel honesty, per-slot CostGuard isolation
 
-PHASE 6 — RESEARCH MODE ................................. PLANNED
-    - Research questions, multi-step investigation, source tracking
-    - Synthesis reports stored in research table
-    - Optional allow-listed web fetch through the permission system
+PHASE 6 — RESEARCH MODE ............................... DONE (v0.8.0)
+    - Web-grounded answers with numbered [n] citations
+    - SSRF-guarded fetch (private/loopback blocked, redirect
+      re-validation, hard size caps, honest truncation flags)
+    - Failed sources are dropped and said so; no grounding →
+      the run fails instead of hallucinating
+    - Same web layer powers the agent's web tools (READ-tier)
 
-PHASE 7 — GIT / GITHUB INTEGRATION ...................... PLANNED
-    - Status, diff, commit, branch, push from the UI
-    - GitHub PR/issue flows — always via permissions + audit log
+PHASE 7 — GIT / GITHUB INTEGRATION .................... DONE (v0.9.0)
+    - Status, diff (capped), log, branch create+switch, commit,
+      push (+set-upstream), remote add — inside the workspace,
+      argv-subprocess (no shell), path containment, git:operate
+      capability (off by default), every op audited
+    - GitHub REST: user, repos, create-private-repo; PAT vault-
+      encrypted, delivered via GIT_ASKPASS, never in argv/logs,
+      only ever to github.com
+    - Destructive ops (reset --hard, force-push, clean) excluded
+      by design
 
-PHASE 8 — EXTENSIBILITY ................................. PLANNED
-    - Additional providers via the registry (cloud providers enter
-      with real per-token prices → immediately subject to CostGuard)
-    - Plugin tools, themes, export/import, encrypted backups
+PHASE 8 — MEMORY & SKILLS ............................. DONE (v0.10.0)
+    - Persistent memories (V5 migration, user CRUD in Settings,
+      agent memory_search/save/forget tools; saves approval-gated,
+      provenance source="agent:<run_id>")
+    - AGENT.md standing instructions chained workspace→project
+      into every run's prompt
 
-RULES: no fake features — every boundary answers 501 until real;
-€0 protection can never regress; schema evolves only via new migrations.
+PHASE 9 — WINDOWS DISTRIBUTION ........................ DONE (v0.11.0)
+    - PyInstaller onedir EXE (SPA bundled), pywebview native
+      window with browser fallback, portable data dir beside the
+      EXE (%LOCALAPPDATA% fallback), deterministic --smoke mode
+    - Inno Setup installer + tag-triggered GitHub Actions release
+      (full test suite gates the build)
+
+PHASE 10 — FINAL POLISH ............................... DONE (v0.12.0)
+    - Command palette (Ctrl+K) with fuzzy-ranked actions, chats
+      and models; full keyboard navigation
+    - Global shortcuts (Ctrl+B / Ctrl+. / Ctrl+, / Ctrl+Alt+N /
+      Ctrl+/ help) + shortcuts reference cards
+    - Sidebar date grouping, chat day separators, jump-to-latest,
+      message timestamps, focus/selection/reduced-motion polish
+
+RULES (kept): no fake features — every boundary is implemented;
+€0 protection never regressed; schema evolved only via new
+migrations (V1–V5); no silent provider switching.

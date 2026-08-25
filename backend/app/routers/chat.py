@@ -44,7 +44,7 @@ async def completions(body: ChatCompletionRequest, request: Request) -> Streamin
         except AppError as exc:
             yield _sse({"type": "error", "code": exc.code, "message": exc.message,
                         "status_code": exc.status_code, "details": exc.details})
-        except Exception as exc:  # pragma: no cover
+        except Exception:  # pragma: no cover
             log.exception("chat completion failed")
             yield _sse({"type": "error", "code": "INTERNAL_ERROR",
                         "message": "Chat failed unexpectedly.", "status_code": 500})
@@ -66,7 +66,7 @@ async def regenerate(body: RegenerateRequest, request: Request) -> StreamingResp
         except AppError as exc:
             yield _sse({"type": "error", "code": exc.code, "message": exc.message,
                         "status_code": exc.status_code, "details": exc.details})
-        except Exception as exc:  # pragma: no cover
+        except Exception:  # pragma: no cover
             log.exception("regenerate failed")
             yield _sse({"type": "error", "code": "INTERNAL_ERROR",
                         "message": "Regeneration failed unexpectedly.", "status_code": 500})

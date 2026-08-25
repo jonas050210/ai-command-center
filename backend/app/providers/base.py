@@ -48,6 +48,13 @@ class ModelInfo:
 class ChatMessage:
     role: str          # system | user | assistant | tool
     content: str
+    # Tool-calling support (normalized OpenAI-style shape; providers
+    # serialize to their native format):
+    #   assistant → tool_calls it requested
+    #   tool      → result addressing one call
+    tool_calls: list[dict[str, Any]] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
 
 
 @dataclass
@@ -59,6 +66,9 @@ class StreamChunk:
     input_tokens: int | None = None
     output_tokens: int | None = None
     eval_duration_ns: int | None = None
+    # Completed tool calls the model requested (normalized:
+    # {"id", "type": "function", "function": {"name", "arguments": dict}})
+    tool_calls: list[dict[str, Any]] | None = None
 
     @property
     def output_tps(self) -> float | None:
@@ -72,6 +82,12 @@ class ChatOptions:
     num_ctx: int | None = None
     temperature: float | None = None
     keep_alive: str | None = None
+    # OpenAI-style tool schemas: [{"type": "function", "function": {...}}]
+    tools: list[dict[str, Any]] | None = None
+    # Structured output constraint (provider-native: Ollama "format" /
+    # OpenRouter "response_format")
+    format: dict[str, Any] | None = None
+    max_tokens: int | None = None
 
 
 class Provider(ABC):
@@ -84,6 +100,10 @@ class Provider(ABC):
     # providers override this and are then subject to the CostGuard.
     cost_input_per_mtok: float = 0.0
     cost_output_per_mtok: float = 0.0
+    # Management capabilities (routers hide/disallow what isn't supported)
+    supports_pull: bool = False
+    supports_delete: bool = False
+    requires_api_key: bool = False
 
     @abstractmethod
     async def status(self) -> ProviderStatus: ...

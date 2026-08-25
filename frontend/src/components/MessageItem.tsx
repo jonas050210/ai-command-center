@@ -2,7 +2,7 @@
 // actions: copy, regenerate, retry. Clear error states.
 import { useState } from "react";
 import type { ChatMessageData } from "../types";
-import { cx, copyText, formatNumber } from "../utils";
+import { cx, copyText, formatClock, formatNumber } from "../utils";
 import { Markdown } from "./Markdown";
 import { AlertIcon, BotIcon, CheckIcon, CopyIcon, RefreshIcon } from "../icons";
 
@@ -35,7 +35,8 @@ export function MessageItem({ msg, isLast, onRegenerate }: {
             bg-[rgba(69,227,255,0.1)] border border-[rgba(69,227,255,0.2)] whitespace-pre-wrap break-words">
             {msg.content}
           </div>
-          <div className="flex justify-end mt-1 opacity-0 hover:opacity-100 transition-opacity">
+          <div className="flex items-center justify-end gap-1.5 mt-1 opacity-0 hover:opacity-100 transition-opacity">
+            <span className="text-[9.5px] text-faint">{formatClock(msg.created_at)}</span>
             <button className="icon-btn !w-6 !h-6" title="Copy"
               onClick={async () => {
                 if (await copyText(msg.content)) { setCopied(true); window.setTimeout(() => setCopied(false), 1200); }
@@ -59,6 +60,7 @@ export function MessageItem({ msg, isLast, onRegenerate }: {
           <BotIcon className="w-3 h-3" />
         </span>
         <span className="text-[11px] font-semibold text-dim">{msg.model ?? "assistant"}</span>
+        <span className="text-[9.5px] text-faint">{formatClock(msg.created_at)}</span>
         <TokenChip msg={msg} />
         {stopped && <span className="chip chip-warn !text-[9.5px]">stopped</span>}
         {failed && <span className="chip chip-bad !text-[9.5px]">error</span>}

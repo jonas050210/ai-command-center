@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useStore } from "../store";
 import { cx, formatEuro, formatNumber } from "../utils";
-import { ChevronDownIcon, CpuIcon, ShieldIcon, ZapIcon } from "../icons";
+import { ChevronDownIcon, CpuIcon, KeyboardIcon, ShieldIcon, ZapIcon } from "../icons";
 
 function Section({ title, children, defaultOpen = true, right }: {
   title: string; children: React.ReactNode; defaultOpen?: boolean; right?: React.ReactNode;
@@ -167,6 +167,11 @@ export function RightInspector() {
         <Row label="Latency" value={ollama?.latency_ms != null ? `${ollama.latency_ms.toFixed(0)} ms` : "Unknown"} />
         <Row label="Host" value={<span className="text-[10.5px]">{ollama?.host ?? "Unknown"}</span>} />
         <Row label="Models installed" value={ollama?.models_count != null ? formatNumber(ollama.models_count) : "Unknown"} />
+        {(system?.providers ?? []).filter((p) => !p.is_local).map((p) => (
+          <Row key={p.name} label={p.display_name}
+            tone={p.configured && p.last_status === "running" ? "text-good" : "text-warn"}
+            value={p.configured ? (p.last_status ?? "unknown") : "no key"} />
+        ))}
         <div className="h-px bg-line my-1.5" />
         <Row label="API uptime"
           value={system ? `${Math.floor(system.metrics.uptime_s / 60)}m ${Math.floor(system.metrics.uptime_s % 60)}s` : "Unknown"} />
@@ -178,6 +183,23 @@ export function RightInspector() {
           <ZapIcon className="w-3 h-3" />
           <span>Enforcement: backend CostGuard · UI never bypasses it</span>
         </div>
+      </Section>
+
+      <Section title="Shortcuts" defaultOpen={false}
+        right={<KeyboardIcon className="w-3 h-3 text-faint" />}>
+        {([
+          ["Ctrl K", "Command palette"],
+          ["Ctrl B", "Toggle sidebar"],
+          ["Ctrl .", "Toggle inspector"],
+          ["Ctrl ,", "Settings"],
+          ["Ctrl Alt N", "New chat"],
+          ["Ctrl /", "Shortcuts help"],
+        ] as const).map(([keys, label]) => (
+          <div key={keys} className="flex items-center justify-between py-[3px] text-[11.5px]">
+            <span className="text-faint">{label}</span>
+            <kbd className="kbd">{keys}</kbd>
+          </div>
+        ))}
       </Section>
     </aside>
   );

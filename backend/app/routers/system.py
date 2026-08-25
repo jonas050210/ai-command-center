@@ -8,6 +8,19 @@ from ..observability.metrics import metrics
 router = APIRouter(prefix="/system", tags=["system"])
 
 
+@router.get("/security/state")
+async def security_state(request: Request) -> dict:
+    """Non-sensitive security posture (never reveals the token itself)."""
+    svc = request.app.state.services
+    s = svc.settings
+    return {
+        "loopback_binding": s.binds_loopback,
+        "token_required_off_loopback": not s.binds_loopback,
+        "rate_limits_enabled": s.enable_rate_limits,
+        "allowed_hostnames": sorted(s.allowed_hostnames()),
+    }
+
+
 @router.get("/status")
 async def system_status(request: Request) -> dict:
     svc = request.app.state.services
@@ -27,6 +40,18 @@ async def system_status(request: Request) -> dict:
         "models_in_catalog": models_count,
         "runtime": rt,
         "currency": svc.settings.currency,
+        # Lightweight provider overview (no live network probes on the 10s
+        # polling path — /api/providers and /api/health do live checks).
+        "providers": [
+            {
+                "name": p.name,
+                "display_name": p.display_name,
+                "is_local": p.is_local,
+                "configured": (p.name == "ollama")
+                    or await svc.credentials_service.has_key(p.name),
+                "last_status": (await svc.providers_repo.get(p.name) or {}).get("status"),
+            } for p in svc.providers_registry.all()
+        ],
         "metrics": {
             "uptime_s": metrics.uptime_s(),
             "http_requests": metrics.http_requests,

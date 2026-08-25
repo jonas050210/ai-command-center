@@ -25,7 +25,7 @@ async def test_conversation_message_crud(db):
     convs, msgs = ConversationsRepo(db), MessagesRepo(db)
     conv = await convs.create("Test chat", "qwen3:0.6b", "ollama", "Be brief.")
     assert conv["title"] == "Test chat"
-    m1 = await msgs.create(conv["id"], "user", "hello")
+    await msgs.create(conv["id"], "user", "hello")
     m2 = await msgs.create(conv["id"], "assistant", "hi", model="qwen3:0.6b",
                            provider="ollama")
     await msgs.finalize(m2["id"], content="hi there", status="complete",

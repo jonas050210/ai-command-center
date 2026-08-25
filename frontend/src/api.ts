@@ -21,8 +21,24 @@ async function parseError(res: Response): Promise<ApiError> {
   }
 }
 
+/** Off-loopback API token (only needed when the server binds a non-loopback
+ * address; local loopback operation needs nothing). Stored client-side only. */
+export function getApiToken(): string | null {
+  return localStorage.getItem("aicc.apiToken");
+}
+
+export function setApiToken(token: string | null): void {
+  if (token && token.trim()) localStorage.setItem("aicc.apiToken", token.trim());
+  else localStorage.removeItem("aicc.apiToken");
+}
+
+function authHeaders(): Record<string, string> {
+  const t = getApiToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
 export async function getJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) throw await parseError(res);
   return res.json() as Promise<T>;
 }
@@ -30,7 +46,10 @@ export async function getJSON<T>(url: string): Promise<T> {
 export async function sendJSON<T>(method: "POST" | "PUT" | "PATCH" | "DELETE", url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers: {
+      ...authHeaders(),
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) throw await parseError(res);
@@ -49,7 +68,7 @@ export async function streamSSE<T = unknown>(
 ): Promise<void> {
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal: signal ?? null,
   });

@@ -3,15 +3,15 @@
 import { useMemo, useState } from "react";
 import { useStore } from "../store";
 import type { ConversationData, View } from "../types";
-import { cx, formatNumber, timeAgo } from "../utils";
+import { cx, dayBucket, formatNumber, timeAgo } from "../utils";
 import {
-  ArchiveIcon, BotIcon, ChatIcon, CheckIcon, EditIcon, FolderIcon, GitIcon,
-  ModelsIcon, PinIcon, PlusIcon, ResearchIcon, SearchIcon, StarIcon, TrashIcon,
-  UsersIcon, XIcon,
+  ArchiveIcon, BotIcon, ChatIcon, CheckIcon, EditIcon, FolderIcon, GaugeIcon,
+  GitIcon, ModelsIcon, PinIcon, PlusIcon, ResearchIcon, SearchIcon, StarIcon,
+  TrashIcon, UsersIcon, XIcon,
 } from "../icons";
 
-function NavItem({ view, icon, label, soon }: {
-  view: View; icon: React.ReactNode; label: string; soon?: boolean;
+function NavItem({ view, icon, label }: {
+  view: View; icon: React.ReactNode; label: string;
 }) {
   const { view: active, setView } = useStore();
   return (
@@ -20,12 +20,10 @@ function NavItem({ view, icon, label, soon }: {
       className={cx(
         "w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[12.5px] transition-all",
         active === view ? "bg-accentdim text-accent border border-[rgba(69,227,255,0.22)]"
-          : soon ? "text-faint hover:text-dim hover:bg-hover border border-transparent"
-            : "text-dim hover:text-ink hover:bg-hover border border-transparent")}
+          : "text-dim hover:text-ink hover:bg-hover border border-transparent")}
     >
       <span className="shrink-0 opacity-90">{icon}</span>
       <span className="flex-1 text-left font-medium">{label}</span>
-      {soon && <span className="chip chip-warn !text-[8.5px] !px-1.5 !py-[1px]">NOT IMPLEMENTED</span>}
     </button>
   );
 }
@@ -138,11 +136,21 @@ export function LeftSidebar() {
   const { convSearch, setConvSearch, conversations, showArchived, setShowArchived,
     setActiveId, setView } = useStore();
 
-  const { pinned, rest } = useMemo(() => {
+  const { pinned, groups } = useMemo(() => {
     const p = conversations.filter((c) => c.pinned);
     const r = conversations.filter((c) => !c.pinned);
-    return { pinned: p, rest: r };
-  }, [conversations]);
+    const ordered = ["Today", "Yesterday", "Previous 7 days", "Older"];
+    const map = new Map<string, ConversationData[]>();
+    for (const c of r) {
+      const bucket = convSearch.trim() ? "Results" : dayBucket(c.updated_at);
+      const list = map.get(bucket) ?? [];
+      list.push(c);
+      map.set(bucket, list);
+    }
+    const keys = convSearch.trim() ? [...map.keys()]
+      : ordered.filter((k) => map.has(k));
+    return { pinned: p, groups: keys.map((k) => [k, map.get(k)!] as const) };
+  }, [conversations, convSearch]);
 
   return (
     <aside className="glass border-y-0 border-l-0 w-[276px] shrink-0 flex flex-col min-h-0"
@@ -156,11 +164,12 @@ export function LeftSidebar() {
         <nav className="space-y-[2px] pt-1">
           <NavItem view="chat" icon={<ChatIcon className="w-4 h-4" />} label="Chat" />
           <NavItem view="models" icon={<ModelsIcon className="w-4 h-4" />} label="Model Center" />
-          <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" soon />
-          <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" soon />
-          <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" soon />
-          <NavItem view="projects" icon={<FolderIcon className="w-4 h-4" />} label="Projects" soon />
-          <NavItem view="git" icon={<GitIcon className="w-4 h-4" />} label="Git / GitHub" soon />
+          <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" />
+          <NavItem view="compare" icon={<GaugeIcon className="w-4 h-4" />} label="Compare Mode" />
+          <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" />
+          <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" />
+          <NavItem view="projects" icon={<FolderIcon className="w-4 h-4" />} label="Projects" />
+          <NavItem view="git" icon={<GitIcon className="w-4 h-4" />} label="Git / GitHub" />
         </nav>
       </div>
 
@@ -189,30 +198,22 @@ export function LeftSidebar() {
           <>
             <div className="micro-label px-1.5 pt-1 pb-1">Pinned</div>
             <div className="space-y-[2px]">{pinned.map((c) => <ConversationRow key={c.id} conv={c} />)}</div>
-            <div className="micro-label px-1.5 pt-3 pb-1">Recent</div>
           </>
         )}
-        <div className="space-y-[2px]">
-          {rest.map((c) => <ConversationRow key={c.id} conv={c} />)}
-          {conversations.length === 0 && (
-            <div className="text-center text-[11.5px] text-faint py-8 px-3">
-              {convSearch ? "No chats match your search." : showArchived
-                ? "No archived chats." : "No conversations yet. Start a new chat above."}
-            </div>
-          )}
-        </div>
+        {groups.map(([label, list]) => (
+          <div key={label}>
+            <div className="micro-label px-1.5 pt-3 pb-1">{label}</div>
+            <div className="space-y-[2px]">{list.map((c) => <ConversationRow key={c.id} conv={c} />)}</div>
+          </div>
+        ))}
+        {conversations.length === 0 && (
+          <div className="text-center text-[11.5px] text-faint py-8 px-3">
+            {convSearch ? "No chats match your search." : showArchived
+              ? "No archived chats." : "No conversations yet. Start a new chat above."}
+          </div>
+        )}
       </div>
 
-      <div className="p-3 border-t border-line">
-        <div className="glass-soft rounded-lg px-3 py-2 flex items-center gap-2.5">
-          <FolderIcon className="w-4 h-4 text-faint shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-[11.5px] text-dim font-medium">Projects</div>
-            <div className="text-[9.5px] text-faint">Workspace management</div>
-          </div>
-          <span className="chip chip-warn !text-[8.5px] !px-1.5 !py-[1px]">NOT IMPLEMENTED</span>
-        </div>
-      </div>
     </aside>
   );
 }

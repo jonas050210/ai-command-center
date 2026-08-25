@@ -43,6 +43,18 @@ class CostGuard:
         else:
             cost_in = float(provider.cost_input_per_mtok)
             cost_out = float(provider.cost_output_per_mtok)
+            # Unsynced CLOUD model: pricing is unknown. Fail closed — an
+            # unknown model is never assumed free.
+            if not provider.is_local:
+                metrics.blocked_paid_requests += 1
+                log.warning("BLOCKED unknown cloud model request: %s/%s "
+                            "(not in synced catalog)", provider.name, model)
+                raise PaidModelBlocked(
+                    "Unknown cloud model blocked. This model is not in the synced "
+                    "catalog, so its price is unknown — nothing was spent. "
+                    "Open Model Center → Refresh and try again.",
+                    details={"provider": provider.name, "model": model,
+                             "reason": "unsynced_cloud_model"})
         is_free = (cost_in == 0.0 and cost_out == 0.0)
 
         if free_only and not is_free:
