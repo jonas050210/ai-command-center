@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useStore } from "../store";
 import { cx, formatEuro, formatNumber } from "../utils";
-import { ChevronDownIcon, CpuIcon, ShieldIcon, ZapIcon } from "../icons";
+import { ChevronDownIcon, CpuIcon, KeyboardIcon, ShieldIcon, ZapIcon } from "../icons";
 
 function Section({ title, children, defaultOpen = true, right }: {
   title: string; children: React.ReactNode; defaultOpen?: boolean; right?: React.ReactNode;
@@ -183,6 +183,23 @@ export function RightInspector() {
           <ZapIcon className="w-3 h-3" />
           <span>Enforcement: backend CostGuard · UI never bypasses it</span>
         </div>
+      </Section>
+
+      <Section title="Shortcuts" defaultOpen={false}
+        right={<KeyboardIcon className="w-3 h-3 text-faint" />}>
+        {([
+          ["Ctrl K", "Command palette"],
+          ["Ctrl B", "Toggle sidebar"],
+          ["Ctrl .", "Toggle inspector"],
+          ["Ctrl ,", "Settings"],
+          ["Ctrl Alt N", "New chat"],
+          ["Ctrl /", "Shortcuts help"],
+        ] as const).map(([keys, label]) => (
+          <div key={keys} className="flex items-center justify-between py-[3px] text-[11.5px]">
+            <span className="text-faint">{label}</span>
+            <kbd className="kbd">{keys}</kbd>
+          </div>
+        ))}
       </Section>
     </aside>
   );

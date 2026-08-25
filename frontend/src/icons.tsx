@@ -54,3 +54,5 @@ export const DatabaseIcon = I('<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M
 export const CaretDownIcon = I('<path d="m8 10 4 4 4-4"/>');
 export const TerminalIcon = I('<path d="m4 17 6-6-6-6M12 19h8"/>');
 export const ToolsIcon = I('<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>');
+export const KeyboardIcon = I('<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/>');
+export const ArrowDownIcon = I('<path d="M12 5v14M5 12l7 7 7-7"/>');

@@ -63,6 +63,10 @@ interface Store {
   toggleRight: () => void;
   settingsOpen: boolean;
   setSettingsOpen: (b: boolean) => void;
+  paletteOpen: boolean;
+  setPaletteOpen: (b: boolean) => void;
+  helpOpen: boolean;
+  setHelpOpen: (b: boolean) => void;
 
   toasts: Toast[];
   notify: (text: string, kind?: Toast["kind"]) => void;
@@ -97,6 +101,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [leftOpen, setLeftOpen] = useState(() => localStorage.getItem("aicc.left") !== "0");
   const [rightOpen, setRightOpen] = useState(() => localStorage.getItem("aicc.right") !== "0");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const searchRef = useRef(convSearch);
   searchRef.current = convSearch;
@@ -257,7 +263,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     conversations, convSearch, setConvSearch, showArchived, setShowArchived,
     refreshConversations, activeId, setActiveId, activeConv, setActiveConv,
     currentModel, setCurrentModel, leftOpen, rightOpen, toggleLeft, toggleRight,
-    settingsOpen, setSettingsOpen, toasts, notify,
+    settingsOpen, setSettingsOpen, paletteOpen, setPaletteOpen,
+    helpOpen, setHelpOpen, toasts, notify,
     archiveConversation, removeConversation, patchConversation,
   }), [view, settings, refreshSettings, system, refreshSystem, costs, refreshCosts,
     tokens, refreshTokens, models, modelsRecent, modelsCategories, providerCaps,
@@ -265,8 +272,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     saveProviderKey, removeProviderKey,
     conversations, convSearch, showArchived, refreshConversations,
     activeId, setActiveId, activeConv, currentModel, setCurrentModel, leftOpen,
-    rightOpen, toggleLeft, toggleRight, settingsOpen, toasts, notify,
-    archiveConversation, removeConversation, patchConversation]);
+    rightOpen, toggleLeft, toggleRight, settingsOpen, paletteOpen, helpOpen,
+    toasts, notify, archiveConversation, removeConversation, patchConversation]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

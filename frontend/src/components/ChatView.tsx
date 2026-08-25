@@ -1,10 +1,11 @@
 // ChatView — the premium chat workspace. Real SSE streaming against the
 // backend (which talks to Ollama). No simulated responses anywhere.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { getJSON, sendJSON, streamSSE, ApiError } from "../api";
 import { useStore } from "../store";
 import type { ChatMessageData, ConversationData, SSEvent } from "../types";
-import { AlertIcon, LogoIcon, ShieldIcon } from "../icons";
+import { dayLabel, sameDay } from "../utils";
+import { AlertIcon, ArrowDownIcon, LogoIcon, ShieldIcon } from "../icons";
 import { Composer } from "./Composer";
 import { MessageItem, StreamingBubble } from "./MessageItem";
 
@@ -27,9 +28,21 @@ export function ChatView() {
   const [stream, setStream] = useState<StreamState | null>(null);
   const [bannerError, setBannerError] = useState<{ code: string; message: string } | null>(null);
   const [compactedNote, setCompactedNote] = useState(false);
+  const [showJump, setShowJump] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const streamingRef = useRef(false);
+
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowJump(el.scrollHeight - el.scrollTop - el.clientHeight > 320);
+  }, []);
+
+  const jumpToLatest = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, []);
 
   // ── load conversation ────────────────────────────────────────────
   useEffect(() => {
@@ -209,7 +222,8 @@ export function ChatView() {
       )}
 
       {/* messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0 py-4">
+      <div className="flex-1 relative min-h-0 flex flex-col">
+      <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto min-h-0 py-4">
         {isNew && messages.length === 0 && !stream && (
           <div className="h-full flex flex-col items-center justify-center px-6 text-center anim-fade-up">
             <div className="text-accent mb-5 opacity-90"><LogoIcon className="scale-[2.2]" /></div>
@@ -239,11 +253,18 @@ export function ChatView() {
           </div>
         )}
 
-        {messages.map((msg) => (
-          <MessageItem key={msg.id} msg={msg}
-            isLast={msg.id === lastAssistantId && !stream}
-            onRegenerate={regenerate} />
-        ))}
+        {messages.map((msg, i) => {
+          const prev = i > 0 ? messages[i - 1] : null;
+          const newDay = !prev || !sameDay(prev.created_at, msg.created_at);
+          return (
+            <Fragment key={msg.id}>
+              {newDay && <div className="day-sep" aria-hidden="true">{dayLabel(msg.created_at)}</div>}
+              <MessageItem msg={msg}
+                isLast={msg.id === lastAssistantId && !stream}
+                onRegenerate={regenerate} />
+            </Fragment>
+          );
+        })}
 
         {compactedNote && (
           <div className="mx-6 mb-2 text-[10.5px] text-faint flex items-center gap-1.5 anim-fade-in">
@@ -253,6 +274,13 @@ export function ChatView() {
         )}
         {stream && <StreamingBubble content={stream.content} model={stream.model || "assistant"} />}
         <div className="h-2" />
+      </div>
+      {showJump && (
+        <button className="jump-latest anim-fade-in" onClick={jumpToLatest}
+          title="Jump to the latest message">
+          <ArrowDownIcon className="w-3.5 h-3.5" /> Latest
+        </button>
+      )}
       </div>
 
       <Composer streaming={!!stream} onSend={send} onStop={stop}

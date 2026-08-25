@@ -281,3 +281,73 @@ body {
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
   overflow: hidden;
 }
+
+/* ── command palette / modal overlays ────────────────────────── */
+.palette-backdrop {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(3, 5, 9, 0.62);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 12vh;
+}
+.palette-panel {
+  width: 560px; max-width: calc(100vw - 48px);
+  background: rgba(13, 18, 27, 0.97);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--color-line2);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(69, 227, 255, 0.05);
+  overflow: hidden;
+}
+
+/* ── keyboard key cap ────────────────────────────────────────── */
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 600;
+  color: var(--color-dim);
+  background: rgba(148, 163, 184, 0.09);
+  border: 1px solid var(--color-line2);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 1.5px 6px;
+  white-space: nowrap;
+}
+
+/* ── jump-to-latest ──────────────────────────────────────────── */
+.jump-latest {
+  position: absolute; right: 26px; bottom: 14px; z-index: 20;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600;
+  color: var(--color-accent);
+  background: rgba(13, 18, 27, 0.95);
+  border: 1px solid rgba(69, 227, 255, 0.3);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  transition: all 0.15s ease;
+}
+.jump-latest:hover { background: rgba(69, 227, 255, 0.12); border-color: rgba(69, 227, 255, 0.5); }
+
+/* ── day separator ───────────────────────────────────────────── */
+.day-sep {
+  display: flex; align-items: center; gap: 12px;
+  margin: 14px 24px 6px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--color-faint);
+}
+.day-sep::before, .day-sep::after {
+  content: ""; flex: 1; height: 1px; background: var(--color-line);
+}
+
+/* ── selection + focus + motion preferences ─────────────────── */
+::selection { background: rgba(69, 227, 255, 0.22); color: #eafcff; }
+:focus-visible { outline: 2px solid rgba(69, 227, 255, 0.45); outline-offset: 1px; }
+.icon-btn:focus-visible, .btn:focus-visible { outline-offset: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-up, .anim-fade-in, .stream-caret, .pulse-soft, .skeleton {
+    animation: none !important;
+  }
+  * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}

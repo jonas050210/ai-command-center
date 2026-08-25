@@ -2,12 +2,13 @@
 import { useStore } from "../store";
 import { formatEuro } from "../utils";
 import {
-  ChevronLeftIcon, ChevronRightIcon, LogoIcon, SettingsIcon, ShieldIcon,
+  ChevronLeftIcon, ChevronRightIcon, LogoIcon, SearchIcon, SettingsIcon,
+  ShieldIcon,
 } from "../icons";
 
 export function Header() {
   const { system, costs, settings, leftOpen, rightOpen, toggleLeft, toggleRight,
-    setSettingsOpen } = useStore();
+    setSettingsOpen, setPaletteOpen } = useStore();
   const ollama = system?.ollama;
   const running = ollama?.status === "running";
   const freeOnly = settings?.free_only ?? true;
@@ -26,6 +27,18 @@ export function Header() {
           <div className="text-[9.5px] tracking-[0.22em] text-faint mt-[3px]">LOCAL-FIRST AI WORKSPACE</div>
         </div>
       </div>
+
+      {/* command palette trigger */}
+      <button
+        className="hidden md:flex items-center gap-2.5 ml-4 pl-3 pr-2 py-[5px] rounded-lg
+          border border-line2 bg-[rgba(7,10,16,0.55)] text-faint text-[11.5px]
+          hover:border-[rgba(69,227,255,0.35)] hover:text-dim transition-all min-w-[190px]"
+        onClick={() => setPaletteOpen(true)}
+        title="Command palette — navigate, search chats, switch models">
+        <SearchIcon className="w-3.5 h-3.5 shrink-0" />
+        <span className="flex-1 text-left">Commands, chats, models…</span>
+        <kbd className="kbd">Ctrl K</kbd>
+      </button>
 
       <div className="flex-1" />
 

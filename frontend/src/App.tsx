@@ -12,6 +12,7 @@ import { GitView } from "./components/GitView";
 import { ProjectsView } from "./components/ProjectsView";
 import { ModelCenter } from "./components/ModelCenter";
 import { SettingsDrawer } from "./components/SettingsDrawer";
+import { CommandPalette, ShortcutsHelp, useGlobalShortcuts } from "./components/CommandPalette";
 
 function Toasts() {
   const { toasts } = useStore();
@@ -28,6 +29,7 @@ function Toasts() {
 
 export default function App() {
   const { view, leftOpen, rightOpen } = useStore();
+  useGlobalShortcuts();
   return (
     <div className="flex flex-col h-full">
       <Header />
@@ -46,6 +48,8 @@ export default function App() {
         {rightOpen && view === "chat" && <RightInspector />}
       </div>
       <SettingsDrawer />
+      <CommandPalette />
+      <ShortcutsHelp />
       <Toasts />
     </div>
   );
