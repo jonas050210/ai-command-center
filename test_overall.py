@@ -55,7 +55,7 @@ def run_frontend(kind: str) -> bool:
         return False
     frontend = ROOT / "frontend"
     if not (frontend / "node_modules").exists():
-        print(f"  installing frontend dependencies…")
+        print("  installing frontend dependencies…")
         if subprocess.call([npm, "install", "--no-audit", "--no-fund"], cwd=frontend) != 0:
             record(f"frontend {kind}", False, "npm install failed")
             return False

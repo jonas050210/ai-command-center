@@ -2,7 +2,6 @@
 sandbox workspace; GitHub REST against a fake transport. No network."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest

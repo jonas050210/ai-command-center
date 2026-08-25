@@ -19,7 +19,6 @@ class SlowProvider(FakeOllamaProvider):
 
     async def chat_stream(self, model, messages, options, cancel):
         self.chat_calls += 1
-        t0 = asyncio.get_running_loop().time()
         await asyncio.sleep(0.05)
         yield StreamChunk(content="slow reply")
         yield StreamChunk(content="", done=True, input_tokens=5, output_tokens=2)

@@ -8,7 +8,6 @@ import pytest
 from backend.app.db.repo import MemoriesRepo
 from backend.app.memory.service import (AGENT_MD_NAME, MemoryService)
 from backend.app.security.permissions import Capability, PermissionPolicy
-from tests.conftest import parse_sse
 from tests.test_agent import ALL_CAPS, ToolScriptProvider, tool_call
 
 

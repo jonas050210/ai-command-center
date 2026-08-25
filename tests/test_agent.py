@@ -10,22 +10,16 @@ db, API) is the production code path.
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Any, AsyncIterator
 
-import pytest
 
 from tests.conftest import parse_sse
 
-from backend.app.db.repo import ExecutionsRepo
 from backend.app.providers.base import (ChatMessage, ChatOptions, ModelInfo,
                                         Provider, ProviderStatus, StreamChunk)
 from backend.app.security.permissions import Capability, PermissionPolicy
 from backend.app.services.context import compact_messages
-from backend.app.tools.builtin import (ALLOWED_PROGRAMS, check_command_allowed,
-                                       register_builtin_tools)
-from backend.app.tools.executor import ToolExecutor
-from backend.app.tools.registry import ToolContext, ToolRegistry
+from backend.app.tools.builtin import (ALLOWED_PROGRAMS, check_command_allowed)
 
 ALL_CAPS = {Capability.FILESYSTEM_READ, Capability.FILESYSTEM_WRITE,
             Capability.COMMAND_EXECUTE, Capability.NETWORK_FETCH,
@@ -298,7 +292,7 @@ class TestAgentRunApi:
                                         "model": "script:1"})
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/event-stream")
-        assert f"data: " in r.text and "\n\n" in r.text
+        assert "data: " in r.text and "\n\n" in r.text
         events = parse_sse(r.text)
         types = [e["type"] for e in events]
         assert types[0] == "meta"

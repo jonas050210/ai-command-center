@@ -23,7 +23,6 @@ from pathlib import Path
 
 from ..core.errors import AppError, BadRequest
 from ..db.repo import ExecutionsRepo
-from ..security.permissions import Capability
 from ..services.settings_service import SettingsService
 from ..workspace.paths import resolve_within
 

@@ -10,7 +10,8 @@ Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Pytho
 
 | Area | Capabilities |
 |---|---|
-| **Chat** | New conversation, history, search, rename, delete, archive, pin, favorites, **real SSE streaming**, stop, retry, regenerate, copy, markdown + GFM tables, syntax-highlighted code with per-block copy, model selector, per-chat system prompt, global custom instructions, token counters (exact/estimated), context-usage meter, clear error states, automatic titles. Context compaction keeps long chats inside the model's `num_ctx` honestly (a note marks what was compacted) |
+| **Chat** | New conversation, history (date-grouped + pinned), search, rename, delete, archive, pin, favorites, **real SSE streaming**, stop, retry, regenerate, copy, markdown + GFM tables, syntax-highlighted code with per-block copy, model selector, per-chat system prompt, global custom instructions, token counters (exact/estimated), context-usage meter, day separators, jump-to-latest, message timestamps, clear error states, automatic titles. Context compaction keeps long chats inside the model's `num_ctx` honestly (a note marks what was compacted) |
+| **Productivity** | **Command palette (Ctrl+K)**: fuzzy-ranked actions, view navigation, chat search, model switching — 100% keyboard navigable. Global shortcuts (`Ctrl+B` sidebar, `Ctrl+.` inspector, `Ctrl+,` settings, `Ctrl+Alt+N` new chat, `Ctrl+/` help) with in-app reference cards. Focus-visible rings, `prefers-reduced-motion` support |
 | **Ollama + OpenRouter** | Ollama: detection, installed-model discovery, context length + capabilities from `/api/show`, streaming chat, safe pull & delete, measured speed tests, **tool calling**. OpenRouter: live catalog, `:free` models, key stored Fernet-encrypted, both providers stay strictly separate — no silent switching |
 | **Model Center** | Live catalog (name, provider, local/cloud, availability, capabilities, context length, size, parameters, quantization, measured tok/s, token usage, cost, status), 10 categories, search, filters, sorting, favorites, recently used, speed testing, pull with live progress, delete. Unknown values are shown as **Unknown** — nothing is faked |
 | **Agent Mode** | Tool-calling runs over SSE with **human approval for every write/exec action** (exact diff preview, 10-minute validity), sandboxed file tools (`fs_list/read/write/edit`), allow-listed shell (`shell_run`: python/pytest/git/node/ruff/…, no chaining, dangerous-arg scanner), circuit breaker, cooperative stop, full audit log (`executions` + per-run steps/approvals). Denials are audited, never hidden |
@@ -43,6 +44,10 @@ python start.py          # → http://127.0.0.1:8000
 ```
 
 `python test_overall.py` runs all four required suites: backend tests → frontend type checking → frontend production build → end-to-end system tests.
+
+**Keyboard shortcuts:** `Ctrl+K` command palette · `Ctrl+B` toggle sidebar ·
+`Ctrl+.` toggle inspector · `Ctrl+,` settings · `Ctrl+Alt+N` new chat ·
+`Ctrl+/` shortcuts help (⌘ on macOS). Full project documentation: **PROJECT.md**.
 
 ## Configuration (`.env`)
 

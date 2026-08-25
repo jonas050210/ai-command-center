@@ -17,7 +17,6 @@ import shlex
 import time
 from pathlib import Path
 
-from ..core.errors import PathEscapeError
 from ..security.permissions import Capability, PermissionPolicy
 from ..workspace.paths import resolve_within
 from .registry import ToolContext, ToolDanger, ToolRegistry, ToolResult, ToolSpec

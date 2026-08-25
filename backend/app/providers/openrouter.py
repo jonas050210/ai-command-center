@@ -294,7 +294,6 @@ class OpenRouterProvider(Provider):
             tool_acc = _ToolCallAccumulator()
             final_in: int | None = None
             final_out: int | None = None
-            saw_done = False
             async for raw_line in response.aiter_lines():
                 if cancel.is_set():
                     await response.aclose()
@@ -304,7 +303,6 @@ class OpenRouterProvider(Provider):
                     continue
                 data_str = line[5:].strip()
                 if data_str == "[DONE]":
-                    saw_done = True
                     calls = tool_acc.finalize()
                     yield StreamChunk(content="", done=True,
                                       input_tokens=final_in, output_tokens=final_out,

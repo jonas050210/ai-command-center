@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 
 from tests.conftest import parse_sse
 from tests.test_agent import ToolScriptProvider, tool_call

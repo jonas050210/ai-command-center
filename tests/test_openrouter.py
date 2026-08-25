@@ -14,7 +14,7 @@ import json
 import httpx
 import pytest
 
-from backend.app.core.errors import PaidModelBlocked, ProviderError, ProviderUnavailable
+from backend.app.core.errors import PaidModelBlocked, ProviderError
 from backend.app.providers.base import ChatMessage, ChatOptions
 from backend.app.providers.openrouter import (DEFAULT_BASE_URL,
                                               OpenRouterProvider)

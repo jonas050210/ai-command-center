@@ -9,7 +9,6 @@ it only shapes the outgoing payload, and callers expose it honestly
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Awaitable, Callable
 

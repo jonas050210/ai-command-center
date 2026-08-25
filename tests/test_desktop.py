@@ -9,7 +9,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
 
 from backend.app import config
 from backend.app.config import Settings
