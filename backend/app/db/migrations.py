@@ -282,12 +282,17 @@ CREATE TABLE IF NOT EXISTS memories (
 );
 """
 
+SCHEMA_V6 = """
+ALTER TABLE projects ADD COLUMN linked INTEGER NOT NULL DEFAULT 0;
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "initial_schema", SCHEMA_V1),
     (2, "agent_mode", SCHEMA_V2),
     (3, "agent_run_projects", SCHEMA_V3),
     (4, "team_runs", SCHEMA_V4),
     (5, "memories", SCHEMA_V5),
+    (6, "linked_projects", SCHEMA_V6),
 ]
 
 

@@ -5,7 +5,7 @@ import { useStore } from "../store";
 import type { ConversationData, View } from "../types";
 import { cx, dayBucket, formatNumber, timeAgo } from "../utils";
 import {
-  ArchiveIcon, BotIcon, ChatIcon, CheckIcon, EditIcon, FolderIcon, GaugeIcon,
+  ArchiveIcon, BotIcon, ChatIcon, CheckIcon, CodeIcon, EditIcon, FolderIcon, GaugeIcon,
   GitIcon, ModelsIcon, PinIcon, PlusIcon, ResearchIcon, SearchIcon, StarIcon,
   TrashIcon, UsersIcon, XIcon,
 } from "../icons";
@@ -165,6 +165,7 @@ export function LeftSidebar() {
           <NavItem view="chat" icon={<ChatIcon className="w-4 h-4" />} label="Chat" />
           <NavItem view="models" icon={<ModelsIcon className="w-4 h-4" />} label="Model Center" />
           <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" />
+          <NavItem view="coder" icon={<CodeIcon className="w-4 h-4" />} label="Coder Mode" />
           <NavItem view="compare" icon={<GaugeIcon className="w-4 h-4" />} label="Compare Mode" />
           <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" />
           <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" />

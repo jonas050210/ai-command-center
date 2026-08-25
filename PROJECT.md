@@ -4,8 +4,8 @@
 what it is, what it does, how it is built, file by file, exactly how it was
 verified, what it cost to build (€0 infra, local-first), and its honest limits.
 
-- **Version:** 0.12.0 · **Status:** all roadmap phases P0–P10 complete
-- **Tests:** 239/239 pytest passing · frontend `tsc --noEmit` clean ·
+- **Version:** 0.14.0 · **Status:** all roadmap phases P0–P12 complete
+- **Tests:** pytest + frontend `tsc --noEmit` + production build — see test_overall.py ·
   production build clean · live end-to-end smokes 19/19 + 21/21 + 14/14
 - **Repo:** `jonas050210/ai-command-center` · branch of record: this session's
   working branch · **Platform target:** Windows 11 (works on Linux/macOS)
@@ -23,6 +23,7 @@ models into a complete working environment:
 |---|---|
 | **Chat** | Real SSE streaming chat with token accounting labeled exact/estimated |
 | **Agent Mode** | Tool-calling agent with human approval for *every* write/exec action |
+| **Coder Mode** | Project workspace + file tree + the same agent (Ollama, not OpenCode) |
 | **Projects** | Sandboxed per-project workspaces the agent can be scoped into |
 | **Compare Mode** | One prompt → 2–4 models streamed side-by-side (VRAM-honest) |
 | **Team Mode** | Planner→executor→reviewer pipelines of 2–4 models with verdicts |
@@ -352,6 +353,7 @@ routers/services.
 `GET|POST|PATCH|DELETE /api/conversations[/{id}]` ·
 `POST /api/chat/completions|regenerate|stop (SSE)` ·
 `POST /api/agent/runs (SSE)` + stop/history/approvals/capabilities/tools/executions ·
+`GET /api/coder/profile|tree|file` ·
 `GET|POST /api/projects` (+archive) · `POST /api/compare/runs (SSE)` ·
 `GET|POST /api/team` + runs (SSE)/stop · `POST /api/research/query (SSE)` +
 history/detail/stop · `GET /api/git/status|log|diff|branches` ·
@@ -374,6 +376,8 @@ Interactive docs: `/api/docs`.
 | P8 | v0.10.0 | **Memory & skills** (V5 migration, memory tools, AGENT.md chaining, Memory UI) |
 | P9 | v0.11.0 | **Windows distribution** (PyInstaller onedir, Inno installer, release CI, frozen-aware config, `--smoke`) |
 | P10 | v0.12.0 | **Final polish**: command palette (Ctrl+K), shortcuts system, date-grouped sidebar, chat day separators + jump-to-latest, timestamps, reduced-motion/focus a11y, PROJECT.md, docs refresh |
+| P11 | v0.13.0 | **Coder Mode**: project file tree + read-only preview, hardware-honest 8GB model profile, same agent gateway (no OpenCode process) |
+| P12 | v0.14.0 | **Real-repo Coder**: attach existing folder, auto-injected tree+git, loaded-model/GPU chip + unload, run snapshot undo |
 
 Commits on this branch (newest first): `38fd717` P10 GUI+docs ·
 `b544855` P9 desktop · `f542633` P8 memory · `23fcbcf` P7 git ·
@@ -415,6 +419,10 @@ Keyboard: **Ctrl+K** palette · **Ctrl+B** sidebar · **Ctrl+.** inspector ·
 6. **MCP / plugin market** — deliberately deferred: current 10 builtin tools
    cover the roadmap scope; adding external tool servers would need a new
    trust/audit design before it belongs in this product.
+7. **OpenCode is not embedded.** Coder Mode is a UI on the existing agent.
+   Use OpenCode yourself as a sidecar CLI against Ollama if you want that TUI.
+8. **No OpenAI provider.** Paid APIs stay behind CostGuard / FREE_ONLY.
+   Local coding: `qwen2.5-coder:7b` or `qwen3:8b` at 8k context.
 
 ---
 

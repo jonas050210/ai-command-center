@@ -12,7 +12,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from ..core.errors import BadRequest, NotFound
-from ..schemas import ModelFavoriteRequest, ModelPullRequest, ModelTestRequest
+from ..schemas import (ModelFavoriteRequest, ModelPullRequest,
+                       ModelTestRequest, ModelUnloadRequest)
 from ..services.model_router import ALL_CATEGORIES
 
 router = APIRouter(prefix="/models", tags=["models"])
@@ -98,6 +99,23 @@ async def refresh_models(request: Request) -> dict:
             }
     rt = await svc.settings_service.as_dict()
     return {"results": results, "default_model": rt["default_model"]}
+
+
+@router.post("/unload")
+async def unload_model(body: ModelUnloadRequest, request: Request) -> dict:
+    """Drop a local model from VRAM (Ollama keep_alive=0)."""
+    svc = request.app.state.services
+    provider = svc.providers_registry.get(body.provider)
+    unload = getattr(provider, "unload", None)
+    if unload is None:
+        raise BadRequest(f"Provider '{provider.name}' cannot unload models.",
+                         code="UNSUPPORTED_OPERATION")
+    try:
+        ok = await unload(body.name)
+    except NotImplementedError:
+        raise BadRequest(f"Provider '{provider.name}' cannot unload models.",
+                         code="UNSUPPORTED_OPERATION") from None
+    return {"unloaded": bool(ok), "model": body.name, "provider": provider.name}
 
 
 @router.post("/test")

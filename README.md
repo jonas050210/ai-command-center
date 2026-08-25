@@ -1,6 +1,6 @@
 # AI Command Center
 
-**Local-first AI workspace** — premium chat + Ollama runtime + OpenRouter (free-tier) providers, Agent Mode with human-gated tools, Projects, Compare, Team and Research Mode — with strict **€0 cost protection** enforced in the backend before any provider request is ever made.
+**Local-first AI workspace** — premium chat + Ollama runtime + OpenRouter (free-tier) providers, Agent Mode with human-gated tools, **Coder Mode** (project workspace + file tree), Projects, Compare, Team and Research Mode — with strict **€0 cost protection** enforced in the backend before any provider request is ever made.
 
 Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Python 3.11.9 · Node.js 22 (works on Linux/macOS too).
 
@@ -15,6 +15,7 @@ Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Pytho
 | **Ollama + OpenRouter** | Ollama: detection, installed-model discovery, context length + capabilities from `/api/show`, streaming chat, safe pull & delete, measured speed tests, **tool calling**. OpenRouter: live catalog, `:free` models, key stored Fernet-encrypted, both providers stay strictly separate — no silent switching |
 | **Model Center** | Live catalog (name, provider, local/cloud, availability, capabilities, context length, size, parameters, quantization, measured tok/s, token usage, cost, status), 10 categories, search, filters, sorting, favorites, recently used, speed testing, pull with live progress, delete. Unknown values are shown as **Unknown** — nothing is faked |
 | **Agent Mode** | Tool-calling runs over SSE with **human approval for every write/exec action** (exact diff preview, 10-minute validity), sandboxed file tools (`fs_list/read/write/edit`), allow-listed shell (`shell_run`: python/pytest/git/node/ruff/…, no chaining, dangerous-arg scanner), circuit breaker, cooperative stop, full audit log (`executions` + per-run steps/approvals). Denials are audited, never hidden |
+| **Coder Mode** | Project-scoped coding workspace: file tree + read-only preview + git chip + the **same** agent gateway. Attach an existing folder (link, never copy). Auto-injects tree + git into runs. Per-run snapshot + undo. Hardware-honest model profile for 8GB VRAM (prefers `qwen2.5-coder:7b` / `qwen3:8b`; never recommends `qwen3-coder:30b`). OpenCode is not embedded — Ollama is the runtime |
 | **Projects** | Project workspaces with slug-deduped, path-proven directories; agent runs can be scoped to a project sandbox; archive-only (no destructive delete) |
 | **Compare Mode** | One prompt to 2–4 models streamed side by side; local models run one-at-a-time per provider (VRAM safety, honestly shown as *queued*), clouds parallel; CostGuard blocks only the offending slot |
 | **Team Mode** | Planner → executor → reviewer pipelines of 2–4 models. Executor turns are **real agent runs** (same gateway, approvals, audit); verdict parsing (`VERDICT: ACCEPTED/CHANGES_REQUESTED`) with exactly one revision max; sequential execution respects VRAM |
@@ -83,6 +84,7 @@ ai-command-center/
 │   ├── providers/          # base ABC · ollama · openrouter · registry
 │   ├── services/           # model_router · cost_guard · chat · models · settings
 │   │                       # tokens · credentials · context · projects · compare
+│   ├── coder/              # Coder Mode profile + sandboxed tree/file read (REAL)
 │   ├── agent/              # tool-calling engine (REAL) — max-steps, circuit breaker
 │   ├── team/               # planner/executor/reviewer pipelines (REAL)
 │   ├── research/           # web search/fetch layer (SSRF-guarded) + grounded Q&A (REAL)
@@ -92,7 +94,7 @@ ai-command-center/
 │   ├── workspace/          # path-containment sandbox
 │   ├── observability/      # JSON logging (rotation+redaction) · session metrics
 │   └── routers/            # health·system·settings·costs·providers·models·conversations
-│                           # chat·agent·projects·compare·team·research (SSE) · git
+│                           # chat·agent·coder·projects·compare·team·research (SSE) · git
 ├── frontend/               # React 18 · TypeScript (strict) · Vite · Tailwind v4
 │   └── src/                # store · api (REST + SSE) · views (chat/agent/compare/team/
 │                           # research/projects/models) · shared agent UI components
@@ -123,11 +125,11 @@ The EXE embeds the built frontend and backend; on first start it opens a native 
 
 ## API summary
 
-`GET /api/health` · `GET /api/system/status` · `GET|PUT /api/settings` · `GET /api/costs` · `GET /api/usage/tokens` · `GET /api/providers` (+key endpoints) · `GET /api/models` (+filters) · `POST /api/models/refresh|test|pull(SSE)` · favorites/delete · `GET|POST|PATCH|DELETE /api/conversations[/{id}]` · `POST /api/chat/completions|regenerate|stop (SSE)` · `POST /api/agent/runs (SSE)` + stop/history/approvals/capabilities/tools/executions · `GET|POST /api/projects` (+archive) · `POST /api/compare/runs (SSE)` · `GET|POST /api/team` + runs (SSE)/stop · `POST /api/research/query (SSE)` + history/detail/stop · `GET /api/git/status|log|diff|branches` · `POST /api/git/init|branches|commit|push|remote` · `/api/git/github/token|user|repos` · `GET|POST|DELETE /api/memory` · `GET|PUT /api/memory/file` · `GET /api/memory/context`. Interactive docs at `/api/docs`.
+`GET /api/health` · `GET /api/system/status` · `GET|PUT /api/settings` · `GET /api/costs` · `GET /api/usage/tokens` · `GET /api/providers` (+key endpoints) · `GET /api/models` (+filters) · `POST /api/models/refresh|test|pull(SSE)` · favorites/delete · `GET|POST|PATCH|DELETE /api/conversations[/{id}]` · `POST /api/chat/completions|regenerate|stop (SSE)` · `POST /api/agent/runs (SSE)` + stop/history/approvals/capabilities/tools/executions · `GET /api/coder/profile|tree|file` · `GET|POST /api/projects` (+archive) · `POST /api/compare/runs (SSE)` · `GET|POST /api/team` + runs (SSE)/stop · `POST /api/research/query (SSE)` + history/detail/stop · `GET /api/git/status|log|diff|branches` · `POST /api/git/init|branches|commit|push|remote` · `/api/git/github/token|user|repos` · `GET|POST|DELETE /api/memory` · `GET|PUT /api/memory/file` · `GET /api/memory/context`. Interactive docs at `/api/docs`.
 
 ## Hardware notes (RTX 4060 Ti 8GB)
 
-- GPU: `qwen3:0.6b` is instant; 4B–8B models (e.g. `qwen3:4b`, `llama3.1:8b`) are the quality sweet spot on 8GB VRAM.
+- GPU: `qwen3:0.6b` is instant; 4B–8B models (e.g. `qwen3:4b`, `qwen3:8b`, `qwen2.5-coder:7b`) are the quality sweet spot on 8GB VRAM. Coder Mode recommends the 7–8B tags and marks `qwen3-coder:30b` as too big.
 - `num_ctx` 8192 default; drop to 4096 for 7B+ models if VRAM tightens.
 - `keep_alive=10m` avoids reload latency between messages.
 - Compare/Team modes serialize local models per provider automatically — parallel local runs would thrash VRAM.

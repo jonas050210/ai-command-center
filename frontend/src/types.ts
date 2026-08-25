@@ -1,6 +1,6 @@
 // API types — mirrors backend serialization exactly.
 
-export type View = "chat" | "models" | "agent" | "compare" | "team" | "research" | "projects" | "git";
+export type View = "chat" | "models" | "agent" | "coder" | "compare" | "team" | "research" | "projects" | "git";
 
 export interface RuntimeSettings {
   free_only: boolean;
@@ -38,6 +38,13 @@ export interface OllamaStatus {
   models_count: number | null;
   detail: string | null;
   host?: string | null;
+  loaded?: Array<{
+    name: string;
+    size_bytes?: number | null;
+    size_vram?: number | null;
+    device?: string;
+    expires_at?: string | null;
+  }>;
 }
 
 export interface ProviderInfo {
@@ -253,7 +260,8 @@ export interface ExecutionRow {
 // Agent run SSE events — exact mirror of backend/app/agent/engine.py emissions
 export type AgentEvent =
   | { type: "meta"; run_id: string; model: string; provider: string;
-      capabilities: Record<string, boolean>; max_steps: number }
+      capabilities: Record<string, boolean>; max_steps: number;
+      project?: { id: number; name: string } | null }
   | { type: "note"; level: "info" | "warn" | string; message: string }
   | { type: "step"; step: number }
   | { type: "delta"; step: number; content: string }
@@ -283,6 +291,7 @@ export interface ProjectRow {
   file_count: number;
   missing: boolean;
   display_path: string;
+  linked?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -388,4 +397,61 @@ export interface GithubUser {
   name: string | null;
   avatar_url: string | null;
   html_url: string | null;
+}
+
+// ── Coder Mode ───────────────────────────────────────────────────────
+export interface CoderTreeEntry {
+  name: string;
+  path: string;
+  kind: "file" | "dir" | string;
+  size?: number | null;
+  children?: CoderTreeEntry[];
+}
+
+export interface CoderTree {
+  project: { id: number; name: string; root_path?: string } | null;
+  workspace_rel: string;
+  path: string;
+  truncated: boolean;
+  entries: CoderTreeEntry[];
+  count: number;
+}
+
+export interface CoderFile {
+  project: { id: number; name: string } | null;
+  workspace_rel: string;
+  path: string;
+  binary: boolean;
+  size: number;
+  content: string | null;
+  truncated: boolean;
+  note: string | null;
+}
+
+export interface CoderModelHint {
+  provider: string;
+  name: string;
+  is_local: boolean;
+  is_free: boolean;
+  available: boolean;
+  capabilities: string[];
+  too_big_for_8gb: boolean;
+  parameter_size: string | null;
+  reason?: string;
+}
+
+export interface CoderProfile {
+  hardware: {
+    gpu: string;
+    usable_vram_note: string;
+    num_ctx_default: number;
+    avoid: string;
+  };
+  selected: CoderModelHint | null;
+  recommended: CoderModelHint[];
+  pull: string;
+  missing_preferred: string[];
+  too_big_installed: string[];
+  skills: string;
+  note: string;
 }

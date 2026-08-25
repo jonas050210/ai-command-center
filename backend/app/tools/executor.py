@@ -64,6 +64,13 @@ class ToolExecutor:
                 return ToolResult(ok=False, output="",
                                   error="This action was denied by the user.")
 
+        # 3b. snapshot originals before a mutating write (P12 undo)
+        if ctx.snapshot is not None and name in {"fs_write", "fs_edit"}:
+            try:
+                ctx.snapshot.record(str(args.get("path") or ""), ctx.root)
+            except Exception:
+                log.warning("snapshot record failed for %s", name, exc_info=True)
+
         # 4. execute
         try:
             result = await spec.handler(args, ctx)

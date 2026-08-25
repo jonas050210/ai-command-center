@@ -1,17 +1,20 @@
 // Header — brand, Ollama status, €0 protection badge, panel toggles.
 import { useStore } from "../store";
 import { formatEuro } from "../utils";
+import { sendJSON } from "../api";
+import { formatBytes } from "../utils";
 import {
   ChevronLeftIcon, ChevronRightIcon, LogoIcon, SearchIcon, SettingsIcon,
-  ShieldIcon,
+  ShieldIcon, XIcon,
 } from "../icons";
 
 export function Header() {
   const { system, costs, settings, leftOpen, rightOpen, toggleLeft, toggleRight,
-    setSettingsOpen, setPaletteOpen } = useStore();
+    setSettingsOpen, setPaletteOpen, refreshSystem, notify } = useStore();
   const ollama = system?.ollama;
   const running = ollama?.status === "running";
   const freeOnly = settings?.free_only ?? true;
+  const loaded = ollama?.loaded ?? [];
 
   return (
     <header className="glass flex items-center gap-2 px-3 h-[52px] shrink-0 border-x-0 border-t-0"
@@ -53,6 +56,23 @@ export function Header() {
           <span className="text-faint">{ollama.latency_ms.toFixed(0)}ms</span>
         )}
       </div>
+
+      {loaded.map((m) => (
+        <div key={m.name} className="chip"
+          title={`Resident in ${m.device === "gpu" ? "VRAM" : "RAM/CPU"} · ${formatBytes(m.size_vram ?? m.size_bytes ?? null)}`}>
+          <span className={`inline-block w-[7px] h-[7px] rounded-full ${m.device === "gpu" ? "bg-good" : "bg-warn"}`} />
+          <span className="font-mono text-ink">{m.name}</span>
+          <span className="text-faint">{m.device === "gpu" ? "GPU" : "CPU"}</span>
+          <button className="icon-btn !w-4 !h-4 !p-0" title="Unload from VRAM"
+            onClick={() => {
+              void sendJSON("POST", "/api/models/unload", { name: m.name, provider: "ollama" })
+                .then(() => { notify(`Unloaded ${m.name}`); void refreshSystem(); })
+                .catch((e) => notify(e instanceof Error ? e.message : "Unload failed", "bad"));
+            }}>
+            <XIcon className="w-2.5 h-2.5" />
+          </button>
+        </div>
+      ))}
 
       {/* Cloud providers (OpenRouter) — never silently active */}
       {(system?.providers ?? []).filter((p) => !p.is_local).map((p) => {

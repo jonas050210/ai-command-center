@@ -7,7 +7,7 @@ import { cx, timeAgo } from "../utils";
 import type { View } from "../types";
 import {
   ArchiveIcon, BotIcon, ChatIcon, ChevronLeftIcon, ChevronRightIcon,
-  FolderIcon, GaugeIcon, GitIcon, KeyboardIcon, ModelsIcon, PlusIcon,
+  CodeIcon, FolderIcon, GaugeIcon, GitIcon, KeyboardIcon, ModelsIcon, PlusIcon,
   ResearchIcon, SearchIcon, SettingsIcon, StarIcon, UsersIcon,
 } from "../icons";
 
@@ -38,6 +38,7 @@ const VIEW_META: Array<{ view: View; label: string; icon: React.ReactNode }> = [
   { view: "chat", label: "Chat", icon: <ChatIcon className="w-4 h-4" /> },
   { view: "models", label: "Model Center", icon: <ModelsIcon className="w-4 h-4" /> },
   { view: "agent", label: "Agent Mode", icon: <BotIcon className="w-4 h-4" /> },
+  { view: "coder", label: "Coder Mode", icon: <CodeIcon className="w-4 h-4" /> },
   { view: "compare", label: "Compare Mode", icon: <GaugeIcon className="w-4 h-4" /> },
   { view: "team", label: "Team Mode", icon: <UsersIcon className="w-4 h-4" /> },
   { view: "research", label: "Research", icon: <ResearchIcon className="w-4 h-4" /> },

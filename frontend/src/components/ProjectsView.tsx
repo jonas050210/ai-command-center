@@ -6,7 +6,7 @@ import { getJSON, sendJSON } from "../api";
 import { useStore } from "../store";
 import type { AgentRunRow, ProjectRow } from "../types";
 import { cx, formatNumber, timeAgo } from "../utils";
-import { BotIcon, FolderIcon, PlusIcon, XIcon } from "../icons";
+import { BotIcon, CodeIcon, FolderIcon, PlusIcon, XIcon } from "../icons";
 
 function ProjectCard({ project, onChanged }: { project: ProjectRow; onChanged: () => void }) {
   const { notify, setView } = useStore();
@@ -45,6 +45,7 @@ function ProjectCard({ project, onChanged }: { project: ProjectRow; onChanged: (
           <div className="text-[13.5px] font-semibold truncate">{project.name}</div>
           <div className="text-[10px] text-faint font-mono truncate">{project.display_path}</div>
         </div>
+        {project.linked && <span className="chip chip-accent !text-[9px]">linked</span>}
         {project.status === "archived" && <span className="chip chip-warn !text-[9px]">archived</span>}
         {project.missing && <span className="chip text-bad !text-[9px] border-[rgba(248,113,113,0.35)]">dir missing</span>}
       </div>
@@ -74,13 +75,22 @@ function ProjectCard({ project, onChanged }: { project: ProjectRow; onChanged: (
           </button>
         )}
         {project.status === "active" && (
-          <button className="btn btn-accent !text-[10.5px] !py-1 !px-2.5 ml-auto"
-            onClick={() => {
-              sessionStorage.setItem("aicc.agentProject", String(project.id));
-              setView("agent");
-            }}>
-            <BotIcon className="w-3 h-3" /> Agent here
-          </button>
+          <>
+            <button className="btn btn-ghost !text-[10.5px] !py-1 !px-2.5 ml-auto"
+              onClick={() => {
+                sessionStorage.setItem("aicc.agentProject", String(project.id));
+                setView("agent");
+              }}>
+              <BotIcon className="w-3 h-3" /> Agent here
+            </button>
+            <button className="btn btn-accent !text-[10.5px] !py-1 !px-2.5"
+              onClick={() => {
+                sessionStorage.setItem("aicc.coderProject", String(project.id));
+                setView("coder");
+              }}>
+              <CodeIcon className="w-3 h-3" /> Code here
+            </button>
+          </>
         )}
       </div>
       {listing !== null && (
@@ -115,6 +125,7 @@ export function ProjectsView() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
+  const [attachPath, setAttachPath] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -183,6 +194,25 @@ export function ProjectsView() {
             <span className="text-[9.5px] text-faint ml-auto">
               Created as <span className="font-mono">projects/&lt;slug&gt;</span> inside the sandbox
             </span>
+          </div>
+          <div className="border-t border-line pt-2.5 space-y-1.5">
+            <div className="text-[11px] font-semibold">Or attach an existing folder</div>
+            <div className="text-[10px] text-faint">Absolute path. Files stay put — archive never deletes them. Tools stay inside that folder.</div>
+            <div className="flex items-center gap-2">
+              <input className="input font-mono !text-[11.5px]" placeholder="D:\\code\\my-app"
+                value={attachPath} onChange={(e) => setAttachPath(e.target.value)} />
+              <button className="btn !text-[11px] !py-1.5 !px-3" disabled={!attachPath.trim() || busy}
+                onClick={() => {
+                  setBusy(true);
+                  void sendJSON("POST", "/api/projects/attach", { path: attachPath.trim(), name: name.trim() })
+                    .then(() => { setAttachPath(""); setName(""); setCreating(false); return refresh(); })
+                    .then(() => notify("Folder attached", "good"))
+                    .catch((e) => notify(e instanceof Error ? e.message : "Attach failed", "bad"))
+                    .finally(() => setBusy(false));
+                }}>
+                Attach
+              </button>
+            </div>
           </div>
         </div>
       )}

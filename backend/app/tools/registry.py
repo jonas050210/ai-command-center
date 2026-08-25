@@ -46,6 +46,7 @@ class ToolContext:
     run_id: str | None = None
     actor: str = "agent"
     memory: Any | None = None        # MemoryService | None (P8)
+    snapshot: Any | None = None      # RunSnapshot | None (P12)
 
     @property
     def root(self):

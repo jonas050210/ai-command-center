@@ -39,6 +39,7 @@ from ..services.settings_service import SettingsService
 from ..tools.executor import ToolExecutor
 from ..tools.registry import ToolContext, ToolRegistry, ToolSpec
 from .prompts import build_agent_system_prompt
+from .snapshots import RunSnapshot, snapshot_for
 
 log = logging.getLogger("aicc.agent")
 
@@ -86,7 +87,9 @@ class AgentEngine:
                  executor: ToolExecutor, runs_manager: RunManager,
                  workspace_root: Path,
                  projects: ProjectService | None = None,
-                 memory: MemoryService | None = None):
+                 memory: MemoryService | None = None,
+                 coder=None,
+                 snapshots_root: Path | None = None):
         self.runs = runs
         self.approvals = approvals
         self.usage = usage
@@ -100,6 +103,8 @@ class AgentEngine:
         self.workspace_root = workspace_root
         self.projects = projects
         self.memory = memory
+        self.coder = coder
+        self.snapshots_root = Path(snapshots_root) if snapshots_root else None
         self._pending_approvals: dict[str, asyncio.Future[bool]] = {}
 
     # ── policy ───────────────────────────────────────────────────────
@@ -127,11 +132,43 @@ class AgentEngine:
         return {"approval_id": approval_id,
                 "status": "approved" if approved else "denied"}
 
+    def snapshot_info(self, run_id: str) -> dict:
+        if self.snapshots_root is None:
+            return {"exists": False, "files": [], "count": 0, "truncated": False}
+        return snapshot_for(self.snapshots_root, run_id).info()
+
+    async def undo_run(self, run_id: str) -> dict:
+        run = await self.runs.get(run_id)
+        if run is None:
+            raise BadRequest(f"Agent run '{run_id}' not found.", code="RUN_NOT_FOUND")
+        if run["status"] == "running":
+            raise BadRequest("Cannot undo a run that is still in progress.",
+                             code="RUN_STILL_RUNNING")
+        if self.snapshots_root is None:
+            raise BadRequest("Snapshots are not configured.", code="SNAPSHOT_UNAVAILABLE")
+        snap = snapshot_for(self.snapshots_root, run_id)
+        info = snap.info()
+        if not info["exists"]:
+            raise BadRequest("This run has no file snapshot to undo.",
+                             code="SNAPSHOT_EMPTY")
+        project_id = run.get("project_id")
+        _row, root = (None, self.workspace_root)
+        if project_id is not None and self.projects is not None:
+            _row, root = await self.projects.root_for_id(
+                int(project_id), allow_archived=True)
+        assert root is not None
+        result = snap.restore(root)
+        await self.runs.add_step(run_id, 0, "note",
+                                 f"undo restored {result['restored']} / "
+                                 f"deleted {result['deleted']} files")
+        return {"run_id": run_id, **result, **info}
+
     # ── run lifecycle (public generator) ─────────────────────────────
     async def stream_run(self, *, task: str, provider_name: str | None,
                          model_name: str | None,
                          skills_text: str | None = None,
-                         project_id: int | None = None) -> AsyncIterator[dict[str, Any]]:
+                         project_id: int | None = None,
+                         mode: str | None = None) -> AsyncIterator[dict[str, Any]]:
         if not task.strip():
             raise BadRequest("Agent task must not be empty.")
 
@@ -140,6 +177,13 @@ class AgentEngine:
             if self.projects is None:                      # pragma: no cover - wired in main
                 raise BadRequest("Projects are not available in this build.")
             project_row, project_root = await self.projects.root_for_id(project_id)
+
+        if (mode or "").strip().lower() == "coder" and self.coder is not None:
+            try:
+                pack = await self.coder.context_pack(project_id)
+            except Exception as exc:
+                pack = f"[CODER CONTEXT unavailable: {exc}]"
+            skills_text = "\n\n".join(p for p in (pack, skills_text) if p)
 
         provider, model, model_row = await self.router.resolve(provider_name, model_name)
         run = await self.runs.create(task=task.strip(), provider=provider.name,
@@ -243,6 +287,9 @@ class AgentEngine:
                 memory_block = await self.memory.memory_text()
             combined_skills = "\n\n".join(
                 p for p in (agent_md, skills_text) if p) or None
+            if skills_text and "[CODER CONTEXT" in skills_text:
+                await emit({"type": "note", "level": "info",
+                            "message": "Coder context injected (file tree + git, capped)."})
             system_prompt = build_agent_system_prompt(
                 workspace_root=str(effective_root),
                 tools=self.tools.describe_all(), skills_text=combined_skills,
@@ -256,9 +303,11 @@ class AgentEngine:
                 ChatMessage(role="system", content=system_prompt),
                 ChatMessage(role="user", content=task),
             ]
+            snap = (RunSnapshot(self.snapshots_root, run_id)
+                    if self.snapshots_root is not None else None)
             ctx = ToolContext(workspace_root=self.workspace_root,
                               project_root=project_root, run_id=run_id,
-                              memory=self.memory)
+                              memory=self.memory, snapshot=snap)
             consecutive_errors = 0
 
             hit_max_steps = False

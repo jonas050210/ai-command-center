@@ -284,6 +284,48 @@ class OllamaProvider(Provider):
                 await response.aclose()
             await client.aclose()
 
+    async def list_loaded(self) -> list[dict]:
+        """Models currently resident (Ollama ``/api/ps``). Empty if none/unavailable."""
+        try:
+            async with self._factory() as client:
+                r = await client.get("/api/ps", timeout=5.0)
+                r.raise_for_status()
+                rows = []
+                for m in (r.json() or {}).get("models") or []:
+                    name = m.get("name") or m.get("model") or ""
+                    if not name:
+                        continue
+                    size = m.get("size")
+                    vram = m.get("size_vram")
+                    if vram is None:
+                        vram = (m.get("size_vram") if "size_vram" in m else None)
+                    device = "gpu" if (vram or 0) > 0 else "cpu"
+                    rows.append({
+                        "name": name,
+                        "size_bytes": size,
+                        "size_vram": vram,
+                        "device": device,
+                        "expires_at": m.get("expires_at"),
+                    })
+                return rows
+        except Exception:
+            return []
+
+    async def unload(self, name: str) -> bool:
+        """Drop a model from VRAM (keep_alive=0)."""
+        try:
+            async with self._factory() as client:
+                r = await client.post("/api/generate",
+                                      json={"model": name, "prompt": "",
+                                            "keep_alive": 0},
+                                      timeout=30.0)
+                if r.status_code == 404:
+                    return False
+                r.raise_for_status()
+                return True
+        except Exception as exc:
+            raise self._map_error(exc, f"unload model '{name}'") from exc
+
     async def delete_model(self, name: str) -> bool:
         try:
             async with self._factory() as client:

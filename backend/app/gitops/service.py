@@ -54,11 +54,13 @@ def validate_branch_name(name: str) -> str:
 
 class GitService:
     def __init__(self, *, executions: ExecutionsRepo, workspace_root: Path,
-                 data_dir: Path, settings: SettingsService):
+                 data_dir: Path, settings: SettingsService,
+                 projects=None):
         self.executions = executions
         self.workspace_root = Path(workspace_root).resolve()
         self.data_dir = Path(data_dir)
         self.settings = settings
+        self.projects = projects
 
     # ── path containment (the sandbox boundary) ──────────────────────
     def resolve_repo(self, path: str | None) -> Path:
@@ -68,6 +70,22 @@ class GitService:
         except Exception as exc:
             raise AppError(getattr(exc, "message", str(exc)),
                            code="PATH_ESCAPE_BLOCKED", status_code=403) from exc
+
+    async def resolve_target(self, path: str | None,
+                             project_id: int | None = None) -> Path:
+        if project_id is not None:
+            if self.projects is None:
+                raise BadRequest("Projects are not available.", code="PROJECT_NOT_FOUND")
+            _row, root = await self.projects.root_for_id(project_id)
+            assert root is not None
+            return root
+        return self.resolve_repo(path)
+
+    def display_path(self, root: Path) -> str:
+        try:
+            return str(root.relative_to(self.workspace_root)) or "."
+        except ValueError:
+            return str(root)
 
     # ── capability gate (mutating ops) ───────────────────────────────
     async def _require_operate(self, op: str, args: list[str]) -> None:
@@ -136,8 +154,8 @@ class GitService:
                 f"'{root.relative_to(self.workspace_root)}' is not a git "
                 "repository. Initialize it first.", code="GIT_NOT_A_REPO")
 
-    async def status(self, path: str | None) -> dict:
-        root = self.resolve_repo(path)
+    async def status(self, path: str | None, project_id: int | None = None) -> dict:
+        root = await self.resolve_target(path, project_id)
         await self._ensure_repo(root)
         rc, out, err = await self._run(
             root, ["status", "--porcelain=v1", "--branch"], op="status")
@@ -167,7 +185,7 @@ class GitService:
         rc, url, _ = await self._run(root, ["remote", "get-url", "origin"],
                                      op="remote", audit=False)
         remote = redact_url(url) if rc == 0 and url.strip() else None
-        return {"path": str(root.relative_to(self.workspace_root)),
+        return {"path": self.display_path(root),
                 "branch": branch or "(no commits yet)", "ahead": ahead,
                 "behind": behind, "remote": remote, "files": files,
                 "clean": not files}

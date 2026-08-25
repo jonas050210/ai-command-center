@@ -5,6 +5,7 @@ import { LeftSidebar } from "./components/LeftSidebar";
 import { RightInspector } from "./components/RightInspector";
 import { ChatView } from "./components/ChatView";
 import { AgentView } from "./components/AgentView";
+import { CoderView } from "./components/CoderView";
 import { CompareView } from "./components/CompareView";
 import { TeamView } from "./components/TeamView";
 import { ResearchView } from "./components/ResearchView";
@@ -38,6 +39,7 @@ export default function App() {
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
           {view === "chat" && <ChatView />}
           {view === "agent" && <AgentView />}
+          {view === "coder" && <CoderView />}
           {view === "compare" && <CompareView />}
           {view === "team" && <TeamView />}
           {view === "research" && <ResearchView />}

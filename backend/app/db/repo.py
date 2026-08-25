@@ -358,10 +358,12 @@ class ProjectsRepo:
     def __init__(self, db: Database):
         self.db = db
 
-    async def create(self, name: str, description: str = "", root_path: str | None = None) -> dict:
+    async def create(self, name: str, description: str = "", root_path: str | None = None,
+                     linked: bool = False) -> dict:
         cur = await self.db.execute(
-            "INSERT INTO projects (name, description, root_path, created_at, updated_at)"
-            " VALUES (?,?,?,?,?)", (name, description, root_path, utcnow(), utcnow()))
+            "INSERT INTO projects (name, description, root_path, linked, created_at, updated_at)"
+            " VALUES (?,?,?,?,?,?)",
+            (name, description, root_path, int(linked), utcnow(), utcnow()))
         return await self.db.fetchone("SELECT * FROM projects WHERE id=?",
                                       (cur.lastrowid,))  # type: ignore[return-value]
 

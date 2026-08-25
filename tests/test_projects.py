@@ -7,6 +7,48 @@ from backend.app.core.errors import AppError
 from tests.test_agent import ToolScriptProvider, tool_call
 
 
+class TestAttachFolder:
+    async def test_attach_existing_dir(self, api, tmp_path):
+        real = tmp_path / "my-real-repo"
+        real.mkdir()
+        (real / "app.py").write_text("print(1)\n", encoding="utf-8")
+        r = await api.client.post("/api/projects/attach",
+                                  json={"path": str(real), "name": "Real"})
+        assert r.status_code == 201, r.text
+        proj = r.json()["project"]
+        assert proj["linked"] is True
+        assert proj["missing"] is False
+        assert "app.py" in str((await api.client.get(
+            f"/api/projects/{proj['id']}")).json()["listing"])
+        # archive never deletes the folder
+        await api.client.patch(f"/api/projects/{proj['id']}", json={"status": "archived"})
+        assert (real / "app.py").is_file()
+
+    async def test_attach_rejects_relative_and_missing(self, api, tmp_path):
+        rel = await api.client.post("/api/projects/attach", json={"path": "relative/nope"})
+        assert rel.status_code == 400
+        assert rel.json()["error"]["code"] == "PATH_NOT_ABSOLUTE"
+        missing = await api.client.post("/api/projects/attach",
+                                        json={"path": str(tmp_path / "does-not-exist")})
+        assert missing.status_code == 400
+        assert missing.json()["error"]["code"] == "PATH_NOT_FOUND"
+
+    async def test_attach_rejects_data_dir(self, api):
+        r = await api.client.post("/api/projects/attach",
+                                  json={"path": str(api.settings.data_dir)})
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "PATH_FORBIDDEN"
+
+    async def test_attach_duplicate(self, api, tmp_path):
+        real = tmp_path / "once"
+        real.mkdir()
+        a = await api.client.post("/api/projects/attach", json={"path": str(real)})
+        b = await api.client.post("/api/projects/attach", json={"path": str(real)})
+        assert a.status_code == 201
+        assert b.status_code == 400
+        assert b.json()["error"]["code"] == "PROJECT_ALREADY_LINKED"
+
+
 class TestProjectsApi:
     async def test_crud_lifecycle(self, api):
         create = await api.client.post("/api/projects",
