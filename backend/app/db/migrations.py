@@ -200,8 +200,116 @@ CREATE TABLE IF NOT EXISTS credentials (
 );
 """
 
+SCHEMA_V2 = """
+-- Project → conversation linkage (a conversation belongs to a project)
+ALTER TABLE conversations ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+-- Project settings (JSON blob: models, team config, memory, git state)
+ALTER TABLE projects ADD COLUMN settings_json TEXT NOT NULL DEFAULT '{}';
+-- Team → project linkage
+ALTER TABLE teams ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+ALTER TABLE teams ADD COLUMN deliverable TEXT NOT NULL DEFAULT '';
+
+-- Agent Mode
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+    task TEXT NOT NULL,
+    workspace TEXT NOT NULL DEFAULT '',
+    plan TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    stage TEXT NOT NULL DEFAULT 'plan',
+    summary TEXT NOT NULL DEFAULT '',
+    error TEXT,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    cost_eur REAL NOT NULL DEFAULT 0.0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS agent_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    seq INTEGER NOT NULL DEFAULT 0,
+    stage TEXT NOT NULL DEFAULT 'execute',
+    tool TEXT,
+    target TEXT,
+    summary TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'done',
+    detail TEXT NOT NULL DEFAULT '',
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_steps_run ON agent_steps(run_id, seq);
+
+-- Team Mode shared state + board
+CREATE TABLE IF NOT EXISTS team_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    phase TEXT NOT NULL DEFAULT 'planning',
+    actor TEXT,
+    kind TEXT NOT NULL DEFAULT 'action',
+    content TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_team_events_team ON team_events(team_id, id);
+
+CREATE TABLE IF NOT EXISTS team_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    assignee TEXT,
+    status TEXT NOT NULL DEFAULT 'todo',
+    progress INTEGER NOT NULL DEFAULT 0,
+    dependencies TEXT NOT NULL DEFAULT '',
+    error TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_team_tasks_team ON team_tasks(team_id, status);
+
+-- Compare Mode
+CREATE TABLE IF NOT EXISTS compare_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prompt TEXT NOT NULL,
+    project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    selected_model TEXT,
+    combined TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS compare_answers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL REFERENCES compare_runs(id) ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    answer TEXT NOT NULL DEFAULT '',
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    token_method TEXT NOT NULL DEFAULT 'estimated',
+    cost_eur REAL NOT NULL DEFAULT 0.0,
+    status TEXT NOT NULL DEFAULT 'complete',
+    error TEXT,
+    selected INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_compare_answers_run ON compare_answers(run_id, id);
+
+-- Research extensions (notes/summary/comparison stay with the query)
+ALTER TABLE research ADD COLUMN notes TEXT NOT NULL DEFAULT '';
+ALTER TABLE research ADD COLUMN summary TEXT NOT NULL DEFAULT '';
+ALTER TABLE research ADD COLUMN comparison TEXT NOT NULL DEFAULT '';
+ALTER TABLE research ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL;
+"""
+
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "initial_schema", SCHEMA_V1),
+    (2, "agent_team_compare_research", SCHEMA_V2),
 ]
 
 

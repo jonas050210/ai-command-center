@@ -16,6 +16,7 @@ def serialize(conv: dict, include_messages: list[dict] | None = None) -> dict:
         "model": conv["model"],
         "provider": conv["provider"],
         "system_prompt": conv["system_prompt"],
+        "project_id": conv.get("project_id"),
         "pinned": bool(conv["pinned"]),
         "archived": bool(conv["archived"]),
         "favorite": bool(conv["favorite"]),
@@ -52,7 +53,8 @@ async def list_conversations(request: Request, query: str | None = None,
 async def create_conversation(body: ConversationCreate, request: Request) -> dict:
     svc = request.app.state.services
     conv = await svc.conversations_repo.create(body.title, body.model, body.provider,
-                                               body.system_prompt)
+                                               body.system_prompt,
+                                               project_id=body.project_id)
     return serialize(conv)
 
 

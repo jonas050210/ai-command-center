@@ -1,6 +1,4 @@
 """Chat API tests — streaming, tokens, persistence, blocking, stop, regenerate."""
-import asyncio
-
 from backend.app.services.cost_guard import PAID_BLOCKED_MESSAGE
 from tests.conftest import FakePaidProvider, parse_sse
 

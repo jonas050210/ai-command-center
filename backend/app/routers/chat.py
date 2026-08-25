@@ -37,15 +37,16 @@ async def completions(body: ChatCompletionRequest, request: Request) -> Streamin
             async for event in svc.chat.stream_completion(
                     conversation_id=body.conversation_id, content=body.content,
                     provider_name=body.provider, model_name=body.model,
-                    system_prompt=body.system_prompt, temperature=body.temperature):
+                    system_prompt=body.system_prompt, temperature=body.temperature,
+                    project_id=body.project_id):
                 if await request.is_disconnected():
                     break
                 yield _sse(event)
         except AppError as exc:
             yield _sse({"type": "error", "code": exc.code, "message": exc.message,
                         "status_code": exc.status_code, "details": exc.details})
-        except Exception as exc:  # pragma: no cover
-            log.exception("chat completion failed")
+        except Exception:  # pragma: no cover
+            log.exception("chat completion failed", exc_info=True)
             yield _sse({"type": "error", "code": "INTERNAL_ERROR",
                         "message": "Chat failed unexpectedly.", "status_code": 500})
 
@@ -66,8 +67,8 @@ async def regenerate(body: RegenerateRequest, request: Request) -> StreamingResp
         except AppError as exc:
             yield _sse({"type": "error", "code": exc.code, "message": exc.message,
                         "status_code": exc.status_code, "details": exc.details})
-        except Exception as exc:  # pragma: no cover
-            log.exception("regenerate failed")
+        except Exception:  # pragma: no cover
+            log.exception("regenerate failed", exc_info=True)
             yield _sse({"type": "error", "code": "INTERNAL_ERROR",
                         "message": "Regeneration failed unexpectedly.", "status_code": 500})
 

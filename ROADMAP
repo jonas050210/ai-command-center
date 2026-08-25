@@ -1,14 +1,14 @@
 AI COMMAND CENTER — ROADMAP
 ================================================================
 
-PHASE 1 — FOUNDATION .................................... DONE (v0.3.0)
+PHASE 1 — FOUNDATION .................................... DONE (v0.4.0)
     FastAPI + SQLite (aiosqlite, async, migration-managed),
     modular boundaries (provider, model router, agent, team,
     workspace, tools, research, git, security, observability),
     env config, JSON structured logging, unified errors,
-    health checks, 15-table schema, encrypted credential vault.
+    health checks, encrypted credential vault, path sandbox.
 
-PHASE 2 — PREMIUM CHAT .................................. DONE (v0.3.0)
+PHASE 2 — PREMIUM CHAT .................................. DONE (v0.4.0)
     Real SSE streaming chat against Ollama; history, search,
     rename, delete, archive, pin, favorites; stop, retry,
     regenerate; markdown + GFM; syntax-highlighted code w/ copy;
@@ -16,44 +16,51 @@ PHASE 2 — PREMIUM CHAT .................................. DONE (v0.3.0)
     estimated token labels; context meter; error states; auto-
     titles from the local model. Zero simulated responses.
 
-PHASE 3 — MODEL CENTER + TOKEN/COST SYSTEM .............. DONE (v0.3.0)
+PHASE 3 — MODEL CENTER + TOKEN/COST SYSTEM .............. DONE (v0.4.0)
     Live Ollama discovery, categories, search/filter/sort,
     favorites, recently used, selection, speed tests, safe
     pull/delete. Per-model token/cost ledger. Strict €0
     CostGuard (FREE_ONLY, MAX_SPEND, pre-network blocking,
     no paid fallback) — tested against bypass attempts.
 
-PHASE 4 — AGENT MODE + PROJECTS ......................... NEXT
-    - Projects UI over existing tables (files, tasks, context)
-    - Agent engine behind the existing permission policy:
-      filesystem sandbox (workspace/), allow-listed commands,
-      every execution logged to executions
-    - Coding Workspace: read/edit/create files with diffs,
-      run tests, iterate — strictly inside the sandbox
-    - Compare Mode: run 2 models on the same prompt side-by-side
+PHASE 4 — AGENT MODE + PROJECTS + COMPARE ................ DONE (v0.4.0)
+    - Controlled Agent: PLAN → EXECUTE → VERIFY → FIX →
+      FINALIZE with sandboxed file tools, allowlisted commands
+      (no shell), timeouts, full audit; per-step persistence.
+    - Projects: first-class workspaces (files, tasks, chats,
+      settings) that Agent/Team runs can target.
+    - Compare Mode: N models answer one prompt side-by-side,
+      select best, combine answers.
 
-PHASE 5 — TEAM MODE (FLAGSHIP) .......................... PLANNED
+PHASE 5 — TEAM MODE (FLAGSHIP) .......................... DONE (v0.4.0)
     - 2–4 models: task intake → joint analysis → master plan
-    - Responsibility split by measured strengths (hooks in
-      models.measured_tps, capabilities, categories already exist)
-    - Shared project workspace, cross-review loops, test/fix cycles
-    - Per-member token accounting (schema ready):
-        MODEL A 8,214 · MODEL B 12,421 · TEAM TOTAL 20,635
-    - One deliverable with plan, code and verification report
+    - Role assignment by measured capabilities + manual override
+    - Shared board (TODO/IN PROGRESS/REVIEW/DONE) with manual
+      control; shared events (decisions, findings, errors)
+    - Review → fix → final review → delivery with deliverable
+    - Per-member + TEAM TOTAL token accounting, €0.00 cost
+    - Models run sequentially (single GPU)
 
-PHASE 6 — RESEARCH MODE ................................. PLANNED
-    - Research questions, multi-step investigation, source tracking
-    - Synthesis reports stored in research table
-    - Optional allow-listed web fetch through the permission system
+PHASE 6 — RESEARCH MODE ................................. DONE (v0.4.0)
+    - Real multi-source search (DuckDuckGo; disable-able)
+    - Citations, source list, excerpts, notes, summary,
+      comparison, markdown export
+    - Never fabricates sources — failures are explicit
+    - Search provider can be extended (engine seam)
 
-PHASE 7 — GIT / GITHUB INTEGRATION ...................... PLANNED
-    - Status, diff, commit, branch, push from the UI
-    - GitHub PR/issue flows — always via permissions + audit log
+PHASE 7 — GIT / GITHUB INTEGRATION ...................... DONE (v0.4.0)
+    - Real status, diff, log, branches, add/commit in sandboxed
+      project workspaces (audited, argv-only)
+    - GitHub repos/issues/PRs (real REST) with encrypted token
+      storage; explicit unauthenticated state otherwise
 
 PHASE 8 — EXTENSIBILITY ................................. PLANNED
     - Additional providers via the registry (cloud providers enter
       with real per-token prices → immediately subject to CostGuard)
     - Plugin tools, themes, export/import, encrypted backups
+    - Research: additional search engines; Team: parallel lanes
+      for multi-GPU setups
 
-RULES: no fake features — every boundary answers 501 until real;
-€0 protection can never regress; schema evolves only via new migrations.
+RULES: no fake features — every boundary answers honestly (real data,
+an explicit unavailable state, or a real error); €0 protection can
+never regress; schema evolves only via new migrations.

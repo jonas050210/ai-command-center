@@ -5,13 +5,13 @@ import { useStore } from "../store";
 import type { ConversationData, View } from "../types";
 import { cx, formatNumber, timeAgo } from "../utils";
 import {
-  ArchiveIcon, BotIcon, ChatIcon, CheckIcon, EditIcon, FolderIcon, GitIcon,
-  ModelsIcon, PinIcon, PlusIcon, ResearchIcon, SearchIcon, StarIcon, TrashIcon,
-  UsersIcon, XIcon,
+  ArchiveIcon, BotIcon, ChatIcon, CheckIcon, CompareIcon, EditIcon, FolderIcon,
+  GitIcon, ModelsIcon, PinIcon, PlusIcon, ResearchIcon, SearchIcon, StarIcon,
+  TrashIcon, UsersIcon, XIcon,
 } from "../icons";
 
-function NavItem({ view, icon, label, soon }: {
-  view: View; icon: React.ReactNode; label: string; soon?: boolean;
+function NavItem({ view, icon, label }: {
+  view: View; icon: React.ReactNode; label: string;
 }) {
   const { view: active, setView } = useStore();
   return (
@@ -20,12 +20,10 @@ function NavItem({ view, icon, label, soon }: {
       className={cx(
         "w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-[12.5px] transition-all",
         active === view ? "bg-accentdim text-accent border border-[rgba(69,227,255,0.22)]"
-          : soon ? "text-faint hover:text-dim hover:bg-hover border border-transparent"
-            : "text-dim hover:text-ink hover:bg-hover border border-transparent")}
+          : "text-dim hover:text-ink hover:bg-hover border border-transparent")}
     >
       <span className="shrink-0 opacity-90">{icon}</span>
       <span className="flex-1 text-left font-medium">{label}</span>
-      {soon && <span className="chip chip-warn !text-[8.5px] !px-1.5 !py-[1px]">NOT IMPLEMENTED</span>}
     </button>
   );
 }
@@ -156,11 +154,12 @@ export function LeftSidebar() {
         <nav className="space-y-[2px] pt-1">
           <NavItem view="chat" icon={<ChatIcon className="w-4 h-4" />} label="Chat" />
           <NavItem view="models" icon={<ModelsIcon className="w-4 h-4" />} label="Model Center" />
-          <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" soon />
-          <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" soon />
-          <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" soon />
-          <NavItem view="projects" icon={<FolderIcon className="w-4 h-4" />} label="Projects" soon />
-          <NavItem view="git" icon={<GitIcon className="w-4 h-4" />} label="Git / GitHub" soon />
+          <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" />
+          <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" />
+          <NavItem view="compare" icon={<CompareIcon className="w-4 h-4" />} label="Compare" />
+          <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" />
+          <NavItem view="projects" icon={<FolderIcon className="w-4 h-4" />} label="Projects" />
+          <NavItem view="git" icon={<GitIcon className="w-4 h-4" />} label="Git / GitHub" />
         </nav>
       </div>
 
@@ -210,7 +209,7 @@ export function LeftSidebar() {
             <div className="text-[11.5px] text-dim font-medium">Projects</div>
             <div className="text-[9.5px] text-faint">Workspace management</div>
           </div>
-          <span className="chip chip-warn !text-[8.5px] !px-1.5 !py-[1px]">NOT IMPLEMENTED</span>
+          <button className="btn !text-[9px] !py-[2px] !px-2" onClick={() => setView("projects")}>Open</button>
         </div>
       </div>
     </aside>

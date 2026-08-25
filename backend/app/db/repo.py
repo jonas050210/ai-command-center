@@ -179,12 +179,13 @@ class ConversationsRepo:
         self.db = db
 
     async def create(self, title: str, model: str | None, provider: str | None,
-                     system_prompt: str | None) -> dict:
+                     system_prompt: str | None,
+                     project_id: int | None = None) -> dict:
         cid = new_id()
         await self.db.execute(
             "INSERT INTO conversations (id, title, model, provider, system_prompt,"
-            " created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-            (cid, title, model, provider, system_prompt, utcnow(), utcnow()))
+            " project_id, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (cid, title, model, provider, system_prompt, project_id, utcnow(), utcnow()))
         return await self.get(cid)  # type: ignore[return-value]
 
     async def get(self, cid: str) -> dict | None:
@@ -207,7 +208,7 @@ class ConversationsRepo:
 
     async def update(self, cid: str, **fields: Any) -> None:
         allowed = {"title", "model", "provider", "system_prompt",
-                   "pinned", "archived", "favorite"}
+                   "pinned", "archived", "favorite", "project_id"}
         sets, params = [], []
         for k, v in fields.items():
             if k in allowed and v is not None:
@@ -267,6 +268,26 @@ class MessagesRepo:
         await self.db.execute("DELETE FROM messages WHERE id=?", (mid,))
 
 
+# ──────────────────────────── credentials ────────────────────────────
+class CredentialsRepo:
+    def __init__(self, db: Database):
+        self.db = db
+
+    async def get(self, provider: str) -> dict | None:
+        return await self.db.fetchone("SELECT * FROM credentials WHERE provider=?",
+                                      (provider,))
+
+    async def upsert(self, provider: str, ciphertext: str) -> None:
+        await self.db.execute(
+            "INSERT INTO credentials (provider, ciphertext, created_at, updated_at)"
+            " VALUES (?,?,?,?) ON CONFLICT(provider) DO UPDATE SET"
+            " ciphertext=excluded.ciphertext, updated_at=excluded.updated_at",
+            (provider, ciphertext, utcnow(), utcnow()))
+
+    async def delete(self, provider: str) -> None:
+        await self.db.execute("DELETE FROM credentials WHERE provider=?", (provider,))
+
+
 # ────────────────────────────── usage/costs ───────────────────────────
 class UsageRepo:
     def __init__(self, db: Database):
@@ -318,25 +339,347 @@ class ExecutionsRepo:
             "SELECT * FROM executions ORDER BY id DESC LIMIT ?", (limit,))
 
 
-# ────────────────────── future-phase foundations ──────────────────────
+# ─────────────────────── projects (first-class) ──────────────────────
 class ProjectsRepo:
     def __init__(self, db: Database):
         self.db = db
 
-    async def create(self, name: str, description: str = "", root_path: str | None = None) -> dict:
+    async def create(self, name: str, description: str = "", root_path: str | None = None,
+                     settings_json: str = "{}") -> dict:
         cur = await self.db.execute(
-            "INSERT INTO projects (name, description, root_path, created_at, updated_at)"
-            " VALUES (?,?,?,?,?)", (name, description, root_path, utcnow(), utcnow()))
+            "INSERT INTO projects (name, description, root_path, settings_json,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?)",
+            (name, description, root_path, settings_json, utcnow(), utcnow()))
         return await self.db.fetchone("SELECT * FROM projects WHERE id=?",
                                       (cur.lastrowid,))  # type: ignore[return-value]
 
+    async def get(self, pid: int) -> dict | None:
+        return await self.db.fetchone("SELECT * FROM projects WHERE id=?", (pid,))
+
     async def list(self) -> list[dict]:
-        return await self.db.fetchall("SELECT * FROM projects ORDER BY updated_at DESC")
+        return await self.db.fetchall(
+            "SELECT p.*, (SELECT COUNT(*) FROM tasks t WHERE t.project_id=p.id)"
+            " AS task_count, (SELECT COUNT(*) FROM conversations c WHERE c.project_id=p.id)"
+            " AS chat_count FROM projects p ORDER BY updated_at DESC")
+
+    async def update(self, pid: int, **fields: Any) -> None:
+        allowed = {"name", "description", "root_path", "settings_json", "status"}
+        sets, params = [], []
+        for k, v in fields.items():
+            if k in allowed and v is not None:
+                sets.append(f"{k}=?")
+                params.append(v)
+        if not sets:
+            return
+        sets.append("updated_at=?")
+        params += [utcnow(), pid]
+        await self.db.execute(f"UPDATE projects SET {', '.join(sets)} WHERE id=?", params)
+
+    async def delete(self, pid: int) -> None:
+        await self.db.execute("DELETE FROM projects WHERE id=?", (pid,))
+
+    # workspace files metadata (content lives on disk, sandboxed)
+    async def add_file(self, project_id: int, path: str, name: str,
+                       size_bytes: int | None, mime: str | None) -> None:
+        await self.db.execute(
+            "INSERT INTO files (project_id, path, name, size_bytes, mime, created_at)"
+            " VALUES (?,?,?,?,?,?)", (project_id, path, name, size_bytes, mime, utcnow()))
+
+    async def list_files(self, project_id: int) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM files WHERE project_id=? ORDER BY path", (project_id,))
+
+    async def clear_files(self, project_id: int) -> None:
+        await self.db.execute("DELETE FROM files WHERE project_id=?", (project_id,))
+
+    # tasks
+    async def add_task(self, project_id: int, title: str, description: str = "") -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO tasks (project_id, title, description, status, created_at,"
+            " updated_at) VALUES (?,?,?,?,?,?)",
+            (project_id, title, description, "todo", utcnow(), utcnow()))
+        return await self.db.fetchone("SELECT * FROM tasks WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def list_tasks(self, project_id: int) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM tasks WHERE project_id=? ORDER BY id", (project_id,))
+
+    async def update_task(self, task_id: int, **fields: Any) -> None:
+        allowed = {"title", "description", "status", "team_id"}
+        sets, params = [], []
+        for k, v in fields.items():
+            if k in allowed and v is not None:
+                sets.append(f"{k}=?")
+                params.append(v)
+        if not sets:
+            return
+        sets.append("updated_at=?")
+        params += [utcnow(), task_id]
+        await self.db.execute(f"UPDATE tasks SET {', '.join(sets)} WHERE id=?", params)
+
+    async def delete_task(self, task_id: int) -> None:
+        await self.db.execute("DELETE FROM tasks WHERE id=?", (task_id,))
 
 
+# ─────────────────────────────── teams ───────────────────────────────
 class TeamsRepo:
     def __init__(self, db: Database):
         self.db = db
 
+    async def create(self, name: str, task: str = "", master_plan: str = "",
+                     status: str = "pending", project_id: int | None = None) -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO teams (name, task, master_plan, status, project_id,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+            (name, task, master_plan, status, project_id, utcnow(), utcnow()))
+        return await self.db.fetchone("SELECT * FROM teams WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def get(self, team_id: int) -> dict | None:
+        return await self.db.fetchone("SELECT * FROM teams WHERE id=?", (team_id,))
+
     async def list(self) -> list[dict]:
-        return await self.db.fetchall("SELECT * FROM teams ORDER BY created_at DESC")
+        return await self.db.fetchall(
+            "SELECT t.*, (SELECT COUNT(*) FROM team_members m WHERE m.team_id=t.id)"
+            " AS member_count FROM teams t ORDER BY id DESC")
+
+    async def update(self, team_id: int, **fields: Any) -> None:
+        allowed = {"name", "task", "master_plan", "status", "project_id"}
+        sets, params = [], []
+        for k, v in fields.items():
+            if k in allowed and v is not None:
+                sets.append(f"{k}=?")
+                params.append(v)
+        if not sets:
+            return
+        sets.append("updated_at=?")
+        params += [utcnow(), team_id]
+        await self.db.execute(f"UPDATE teams SET {', '.join(sets)} WHERE id=?", params)
+
+    async def delete(self, team_id: int) -> None:
+        await self.db.execute("DELETE FROM teams WHERE id=?", (team_id,))
+
+    # members
+    async def add_member(self, team_id: int, model: str, provider: str | None,
+                         role: str = "member", responsibility: str = "") -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO team_members (team_id, provider, model, role, responsibility,"
+            " status) VALUES (?,?,?,?,?,?)",
+            (team_id, provider, model, role, responsibility, "idle"))
+        return await self.db.fetchone("SELECT * FROM team_members WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def members(self, team_id: int) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM team_members WHERE team_id=? ORDER BY id", (team_id,))
+
+    async def update_member(self, member_id: int, **fields: Any) -> None:
+        allowed = {"role", "responsibility", "status", "input_tokens", "output_tokens"}
+        sets, params = [], []
+        for k, v in fields.items():
+            if k in allowed and v is not None:
+                sets.append(f"{k}=?")
+                params.append(v)
+        if not sets:
+            return
+        params += [member_id]
+        await self.db.execute(f"UPDATE team_members SET {', '.join(sets)} WHERE id=?", params)
+
+    async def add_tokens(self, member_id: int, in_tok: int, out_tok: int) -> None:
+        await self.db.execute(
+            "UPDATE team_members SET input_tokens=input_tokens+?,"
+            " output_tokens=output_tokens+? WHERE id=?", (in_tok, out_tok, member_id))
+
+    # shared board
+    async def add_event(self, team_id: int, phase: str, kind: str, content: str,
+                        actor: str | None = None) -> int:
+        cur = await self.db.execute(
+            "INSERT INTO team_events (team_id, phase, actor, kind, content, created_at)"
+            " VALUES (?,?,?,?,?,?)", (team_id, phase, actor, kind, content, utcnow()))
+        return int(cur.lastrowid or 0)
+
+    async def events(self, team_id: int, limit: int = 400) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM team_events WHERE team_id=? ORDER BY id DESC LIMIT ?",
+            (team_id, limit))
+
+    async def add_task(self, team_id: int, title: str, description: str = "",
+                       assignee: str | None = None,
+                       dependencies: str = "") -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO team_tasks (team_id, title, description, assignee, status,"
+            " dependencies, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (team_id, title, description, assignee, "todo", dependencies, utcnow(), utcnow()))
+        return await self.db.fetchone("SELECT * FROM team_tasks WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def tasks(self, team_id: int) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM team_tasks WHERE team_id=? ORDER BY id", (team_id,))
+
+    async def update_task(self, task_id: int, **fields: Any) -> None:
+        allowed = {"title", "description", "assignee", "status", "progress", "error"}
+        sets, params = [], []
+        for k, v in fields.items():
+            if k in allowed and v is not None:
+                sets.append(f"{k}=?")
+                params.append(v)
+        if not sets:
+            return
+        sets.append("updated_at=?")
+        params += [utcnow(), task_id]
+        await self.db.execute(f"UPDATE team_tasks SET {', '.join(sets)} WHERE id=?", params)
+
+    async def token_totals(self, team_id: int) -> dict:
+        row = await self.db.fetchone(
+            "SELECT COALESCE(SUM(input_tokens),0) AS i, COALESCE(SUM(output_tokens),0) AS o"
+            " FROM team_members WHERE team_id=?", (team_id,))
+        cost = await self.db.fetchone(
+            "SELECT COALESCE(SUM(cost_eur),0.0) AS c FROM usage_events WHERE team_id=?",
+            (team_id,))
+        return {"input_tokens": row["i"], "output_tokens": row["o"],
+                "total_tokens": row["i"] + row["o"],
+                "cost_eur": float(cost["c"])}
+
+
+# ─────────────────────────────── agent ───────────────────────────────
+class AgentRepo:
+    def __init__(self, db: Database):
+        self.db = db
+
+    async def create(self, task: str, project_id: int | None, workspace: str) -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO agent_runs (project_id, task, workspace, status, stage,"
+            " created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+            (project_id, task, workspace, "pending", "plan", utcnow(), utcnow()))
+        return await self.db.fetchone("SELECT * FROM agent_runs WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def get(self, run_id: int) -> dict | None:
+        return await self.db.fetchone("SELECT * FROM agent_runs WHERE id=?", (run_id,))
+
+    async def list(self, limit: int = 50) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM agent_runs ORDER BY id DESC LIMIT ?", (limit,))
+
+    async def update(self, run_id: int, **fields: Any) -> None:
+        allowed = {"plan", "status", "stage", "summary", "error", "workspace",
+                   "input_tokens", "output_tokens", "cost_eur"}
+        sets, params = [], []
+        for k, v in fields.items():
+            if k in allowed and v is not None:
+                sets.append(f"{k}=?")
+                params.append(v)
+        if not sets:
+            return
+        sets.append("updated_at=?")
+        params += [utcnow(), run_id]
+        await self.db.execute(f"UPDATE agent_runs SET {', '.join(sets)} WHERE id=?", params)
+
+    async def add_tokens(self, run_id: int, in_tok: int, out_tok: int, cost: float) -> None:
+        await self.db.execute(
+            "UPDATE agent_runs SET input_tokens=input_tokens+?,"
+            " output_tokens=output_tokens+?, cost_eur=cost_eur+?, updated_at=?"
+            " WHERE id=?", (in_tok, out_tok, cost, utcnow(), run_id))
+
+    async def add_step(self, run_id: int, seq: int, stage: str, tool: str | None,
+                       target: str | None, summary: str, status: str,
+                       detail: str = "", in_tok: int = 0,
+                       out_tok: int = 0) -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO agent_steps (run_id, seq, stage, tool, target, summary, status,"
+            " detail, input_tokens, output_tokens, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (run_id, seq, stage, tool, target, summary, status, detail,
+             in_tok, out_tok, utcnow()))
+        return await self.db.fetchone("SELECT * FROM agent_steps WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def steps(self, run_id: int) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM agent_steps WHERE run_id=? ORDER BY seq", (run_id,))
+
+
+# ────────────────────────────── research ─────────────────────────────
+class ResearchRepo:
+    def __init__(self, db: Database):
+        self.db = db
+
+    async def create(self, query: str, project_id: int | None = None) -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO research (query, status, project_id, created_at, updated_at)"
+            " VALUES (?,?,?,?,?)", (query, "pending", project_id, utcnow(), utcnow()))
+        return await self.db.fetchone("SELECT * FROM research WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def get(self, rid: int) -> dict | None:
+        return await self.db.fetchone("SELECT * FROM research WHERE id=?", (rid,))
+
+    async def list(self, limit: int = 50) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM research ORDER BY id DESC LIMIT ?", (limit,))
+
+    async def finish(self, rid: int, *, status: str, result: str, sources_json: str,
+                     notes: str = "", summary: str = "", comparison: str = "") -> None:
+        await self.db.execute(
+            "UPDATE research SET status=?, result=?, sources_json=?, notes=?,"
+            " summary=?, comparison=?, updated_at=? WHERE id=?",
+            (status, result, sources_json, notes, summary, comparison, utcnow(), rid))
+
+    async def delete(self, rid: int) -> None:
+        await self.db.execute("DELETE FROM research WHERE id=?", (rid,))
+
+
+# ────────────────────────────── compare ──────────────────────────────
+class CompareRepo:
+    def __init__(self, db: Database):
+        self.db = db
+
+    async def create(self, prompt: str, project_id: int | None = None) -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO compare_runs (prompt, project_id, status, created_at, updated_at)"
+            " VALUES (?,?,?,?,?)", (prompt, project_id, "pending", utcnow(), utcnow()))
+        return await self.db.fetchone("SELECT * FROM compare_runs WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def get(self, run_id: int) -> dict | None:
+        return await self.db.fetchone("SELECT * FROM compare_runs WHERE id=?", (run_id,))
+
+    async def list(self, limit: int = 50) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM compare_runs ORDER BY id DESC LIMIT ?", (limit,))
+
+    async def finish(self, run_id: int, *, status: str | None = None,
+                     selected: str | None = None, combined: str = "") -> None:
+        if status is None and selected is None and not combined:
+            return
+        await self.db.execute(
+            "UPDATE compare_runs SET"
+            " status=COALESCE(?, status),"
+            " selected_model=COALESCE(?, selected_model),"
+            " combined=COALESCE(?, combined), updated_at=? WHERE id=?",
+            (status, selected, combined or None, utcnow(), run_id))
+
+    async def add_answer(self, run_id: int, model: str, provider: str, answer: str,
+                         in_tok: int, out_tok: int, method: str, cost: float,
+                         status: str = "complete", error: str | None = None) -> dict:
+        cur = await self.db.execute(
+            "INSERT INTO compare_answers (run_id, model, provider, answer, input_tokens,"
+            " output_tokens, token_method, cost_eur, status, error, created_at)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (run_id, model, provider, answer, in_tok, out_tok, method, cost,
+             status, error, utcnow()))
+        return await self.db.fetchone("SELECT * FROM compare_answers WHERE id=?",
+                                      (cur.lastrowid,))  # type: ignore[return-value]
+
+    async def answers(self, run_id: int) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM compare_answers WHERE run_id=? ORDER BY id", (run_id,))
+
+    async def select(self, run_id: int, answer_id: int) -> None:
+        await self.db.execute("UPDATE compare_answers SET selected=0 WHERE run_id=?",
+                              (run_id,))
+        await self.db.execute(
+            "UPDATE compare_answers SET selected=1 WHERE run_id=? AND id=?",
+            (run_id, answer_id))

@@ -52,3 +52,7 @@ export const ClockIcon = I('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"
 export const GaugeIcon = I('<path d="M12 15l4-6"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>');
 export const DatabaseIcon = I('<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>');
 export const CaretDownIcon = I('<path d="m8 10 4 4 4-4"/>');
+export const CompareIcon = I('<path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/>');
+export const CodeIcon = I('<path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/>');
+export const LayersIcon = I('<path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5M3 17l9 5 9-5"/>');
+export const PlayIcon = I('<path d="m7 4 13 8-13 8z"/>');

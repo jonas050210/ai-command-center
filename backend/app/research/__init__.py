@@ -1,11 +1,8 @@
-"""Research Mode — boundary module for a later phase.
+"""Research Mode — real multi-source research with citations.
 
-Status: NOT IMPLEMENTED. The ``research`` table exists as foundation;
-the API boundary returns HTTP 501.
+Only real sources are stored; searches with no results fail honestly.
+See ``engine.ResearchEngine``.
 """
-from ..core.errors import FeatureNotImplemented
+from .engine import ResearchEngine
 
-
-def unavailable() -> None:
-    raise FeatureNotImplemented(
-        "Research Mode is NOT IMPLEMENTED in this phase. See ROADMAP (Phase 6).")
+__all__ = ["ResearchEngine"]

@@ -1,15 +1,9 @@
-"""Team Mode (Multi-Model AI Team) — flagship future feature.
+"""Team Mode — Multi-Model AI Team (flagship).
 
-Status: NOT IMPLEMENTED. Database foundations (teams, team_members,
-tasks, per-member token columns) are already in place so the
-orchestrator can integrate cleanly later. The boundary is exposed at
-``/api/team`` and returns HTTP 501 — never a fake demo.
+2–4 models: task intake → joint analysis → master plan → role assignment
+→ execution → review → fix → final review → delivery. Shared state on the
+team board; per-model tokens and TEAM TOTAL; always €0.00 (CostGuard).
 """
-from ..core.errors import FeatureNotImplemented
+from .engine import TeamEngine
 
-
-def unavailable() -> None:
-    raise FeatureNotImplemented(
-        "Team Mode is NOT IMPLEMENTED in this phase. "
-        "2–4 models planning, dividing and reviewing work arrives in Phase 5 — "
-        "see ROADMAP.")
+__all__ = ["TeamEngine"]

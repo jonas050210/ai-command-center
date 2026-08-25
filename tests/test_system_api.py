@@ -1,4 +1,4 @@
-"""Startup, health, settings, providers + NOT IMPLEMENTED boundaries."""
+"""Startup, health, settings, providers + Phase 4-7 endpoints."""
 
 
 async def test_health(api):
@@ -61,16 +61,20 @@ async def test_providers_endpoint(api):
     assert ollama["status"] == "running"
 
 
-async def test_future_features_return_501_not_implemented(api):
-    for path in ("/api/agent/run", "/api/team/start", "/api/research/query",
-                 "/api/git/status"):
-        r = await api.client.get(path)
-        assert r.status_code == 501, path
-        body = r.json()
-        assert body["error"]["code"] == "NOT_IMPLEMENTED"
-        assert "NOT IMPLEMENTED" in body["error"]["message"]
-        r2 = await api.client.post(path, json={})
-        assert r2.status_code == 501
+async def test_phase4_7_features_are_real_endpoints(api):
+    """Agent / Team / Compare / Research / Projects / Git are implemented now."""
+    assert (await api.client.get("/api/agent/capabilities")).status_code == 200
+    assert (await api.client.get("/api/agent/runs")).status_code == 200
+    assert (await api.client.get("/api/team/runs")).status_code == 200
+    assert (await api.client.get("/api/compare/runs")).status_code == 200
+    assert (await api.client.get("/api/research/runs")).status_code == 200
+    assert (await api.client.get("/api/projects")).status_code == 200
+    assert (await api.client.get("/api/github/state")).status_code == 200
+    # unknown ids are honest 404s
+    assert (await api.client.get("/api/agent/runs/99999")).status_code == 404
+    assert (await api.client.get("/api/team/runs/99999")).status_code == 404
+    assert (await api.client.get("/api/compare/runs/99999")).status_code == 404
+    assert (await api.client.get("/api/research/runs/99999")).status_code == 404
 
 
 async def test_unknown_api_route_shape(api):

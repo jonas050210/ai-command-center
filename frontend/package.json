@@ -1,9 +1,9 @@
 {
   "name": "ai-command-center",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
-  "description": "AI Command Center — local-first AI workspace (Chat + Ollama + Model Center, strict €0 cost protection)",
+  "description": "AI Command Center — local-first AI workspace (Chat, Model Center, Agent, Multi-Model Team, Compare, Research, Projects, Git, strict €0)",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",

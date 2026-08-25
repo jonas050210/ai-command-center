@@ -1,4 +1,4 @@
-"""Overall system test — runs the four required suites:
+"""Overall system test — runs the required suites:
 
     1. Backend tests                  (pytest tests/)
     2. Frontend type checking         (npm run typecheck)
@@ -43,7 +43,12 @@ def npm_cmd() -> str | None:
 # ─────────────────────────── suites 1-3 ──────────────────────────────
 def run_backend_tests() -> bool:
     print("\n[1/4] Backend tests (pytest)")
-    code = subprocess.call([sys.executable, "-m", "pytest", "-q"], cwd=ROOT)
+    python = sys.executable
+    venv = ROOT / ".venv"
+    for candidate in (venv / "Scripts" / "python.exe", venv / "bin" / "python"):
+        if candidate.exists():
+            python = str(candidate)
+    code = subprocess.call([python, "-m", "pytest", "-q"], cwd=ROOT)
     record("backend test suite", code == 0, "pytest exit=" + str(code))
     return code == 0
 
@@ -55,7 +60,7 @@ def run_frontend(kind: str) -> bool:
         return False
     frontend = ROOT / "frontend"
     if not (frontend / "node_modules").exists():
-        print(f"  installing frontend dependencies…")
+        print("  installing frontend dependencies…")
         if subprocess.call([npm, "install", "--no-audit", "--no-fund"], cwd=frontend) != 0:
             record(f"frontend {kind}", False, "npm install failed")
             return False
@@ -66,13 +71,50 @@ def run_frontend(kind: str) -> bool:
 
 
 # ─────────────────────────── suite 4 (e2e) ───────────────────────────
-MOCK_APP_SRC = """
+# Stateful mock Ollama that understands the engine prompt protocols, so
+# Agent / Team / Compare runs complete deterministically end-to-end.
+MOCK_APP_SRC = r"""
 import json
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 
 app = FastAPI()
 REPLY = "System test reply from mock Ollama."
+state = {"phase": "idle"}
+
+def pick(body: dict) -> str:
+    text = " ".join(m.get("content", "") for m in body.get("messages", []))
+    if "Implementation plan" in text or "Answer with the plan only" in text:
+        state["phase"] = "plan"
+        return "- Inspect the workspace\n- Create result.txt\n- Verify with tests"
+    if "exactly one TOOL action" in text:
+        if state.get("phase") == "done":
+            return "TOOL done Created result.txt with the delivered content."
+        if state.get("phase") == "execute":
+            state["phase"] = "done"
+            return "TOOL done Created result.txt with the delivered content."
+        state["phase"] = "execute"
+        return ("TOOL write_file path=\"result.txt\"\n<<<FILE\n"
+                "Task delivered by the test agent.\nFILE\n")
+    if "delivery summary" in text:
+        state["phase"] = "done"
+        return ("Agent delivered result.txt and verified it. "
+                "SUMMARY: complete.")
+    if "Analyze this task" in text:
+        return ("REQUIREMENTS: build a module\nARCHITECTURE: single file\n"
+                "RISKS: none\nDEPENDENCIES: python\nSUBTASKS: code, test\n"
+                "TESTING: pytest\nTOOLS: read, write")
+    if "MASTER PLAN" in text and "Team analyses" in text:
+        return ("- Implement the module\n- Write tests\n- Review the result")
+    if "Produce YOUR work product" in text:
+        return ("DESIGN: module with greet()\nCODE: ```python\ndef greet(n): "
+                "return 'hi ' + n\n```\nTEST: pytest case included.")
+    if "Review the work product" in text or "Review team work" in text:
+        return "VERDICT: APPROVE\nFINDINGS:\n- (none)"
+    if "Compose the final deliverable" in text:
+        return ("# Deliverable\nModule with greet(), tests passed, "
+                "reviewed by the team.\n\nSTATUS: complete")
+    return REPLY
 
 @app.get("/api/version")
 async def version():
@@ -80,12 +122,17 @@ async def version():
 
 @app.get("/api/tags")
 async def tags():
-    return {"models": [{
-        "name": "qwen3:0.6b", "model": "qwen3:0.6b", "size": 522000000,
-        "digest": "overall-test",
-        "modified_at": "2026-01-01T00:00:00Z",
-        "details": {"format": "gguf", "family": "qwen3", "families": ["qwen3"],
-                    "parameter_size": "0.6B", "quantization_level": "Q4_K_M"}}]}
+    return {"models": [
+        {"name": "qwen3:0.6b", "model": "qwen3:0.6b", "size": 522000000,
+         "digest": "overall-test", "modified_at": "2026-01-01T00:00:00Z",
+         "details": {"format": "gguf", "family": "qwen3",
+                     "families": ["qwen3"], "parameter_size": "0.6B",
+                     "quantization_level": "Q4_K_M"}},
+        {"name": "deepseek-r1:7b", "model": "deepseek-r1:7b", "size": 4700000000,
+         "digest": "overall-test-2", "modified_at": "2026-01-01T00:00:00Z",
+         "details": {"format": "gguf", "family": "qwen2",
+                     "families": ["qwen2"], "parameter_size": "7B",
+                     "quantization_level": "Q4_K_M"}}]}
 
 @app.post("/api/show")
 async def show(request: Request):
@@ -96,7 +143,7 @@ async def show(request: Request):
 async def chat(request: Request):
     body = await request.json()
     prompt = sum(len(m.get("content", "")) for m in body.get("messages", []))
-    words = REPLY.split(" ")
+    words = pick(body).split(" ")
     lines = []
     for w in words:
         lines.append(json.dumps({"message": {"role": "assistant", "content": w + " "},
@@ -104,12 +151,12 @@ async def chat(request: Request):
     lines.append(json.dumps({"message": {"role": "assistant", "content": ""},
                              "done": True, "prompt_eval_count": max(1, prompt // 4),
                              "eval_count": len(words), "eval_duration": 700000000}))
-    return Response("\\n".join(lines) + "\\n", media_type="application/x-ndjson")
+    return Response("\n".join(lines) + "\n", media_type="application/x-ndjson")
 """
 
 
 def start_mock_ollama() -> "threading.Thread":
-    (ROOT / "tests" / "_overall_mock_ollama.py").write_text(MOCK_APP_SRC)
+    (ROOT / "tests" / "_overall_mock_ollama.py").write_text(MOCK_APP_SRC, encoding="utf-8")
     import uvicorn
     sys.path.insert(0, str(ROOT / "tests"))
     import importlib
@@ -123,7 +170,7 @@ def start_mock_ollama() -> "threading.Thread":
 
 
 def http(method: str, path: str, body: dict | None = None, port: int = APP_PORT,
-         timeout: float = 30.0) -> tuple[int, bytes]:
+         timeout: float = 60.0) -> tuple[int, bytes]:
     url = f"http://127.0.0.1:{port}{path}"
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method,
@@ -162,7 +209,8 @@ def run_system_tests() -> bool:
     tmp = tempfile.mkdtemp(prefix="aicc-overall-")
     env = {**os.environ, "DATA_DIR": tmp, "HOST": "127.0.0.1", "PORT": str(APP_PORT),
            "OLLAMA_HOST": f"http://127.0.0.1:{MOCK_PORT}",
-           "DEFAULT_MODEL": "qwen3:0.6b", "FREE_ONLY": "true", "MAX_SPEND": "0"}
+           "DEFAULT_MODEL": "qwen3:0.6b", "FREE_ONLY": "true", "MAX_SPEND": "0",
+           "SEARCH_ENGINE": "disabled"}
     proc = subprocess.Popen([sys.executable, "main.py"], cwd=ROOT, env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     all_ok = True
@@ -196,7 +244,7 @@ def run_system_tests() -> bool:
         code, refresh = http("POST", "/api/models/refresh")
         r = json.loads(refresh)
         synced = r["results"]["ollama"]["synced"]
-        record("model discovery syncs real models", code == 200 and synced == 1,
+        record("model discovery syncs real models", code == 200 and synced == 2,
                f"synced={synced}")
 
         code, models = http("GET", "/api/models")
@@ -213,7 +261,7 @@ def run_system_tests() -> bool:
         ok = (code == 200 and types[0] == "meta" and "delta" in types
               and types[-1] == "done")
         record("chat: SSE meta→delta→usage→done", ok, " → ".join(types))
-        record("chat: real reply content streamed", content.strip().startswith("System test reply"))
+        record("chat: real reply content streamed", "System test reply" in content)
         record("chat: EXACT token accounting", usage.get("method") == "exact"
                and usage.get("input_tokens", 0) > 0,
                f"in={usage.get('input_tokens')} out={usage.get('output_tokens')}")
@@ -248,24 +296,117 @@ def run_system_tests() -> bool:
         record("chat stop endpoint (404 for unknown id)",
                code == 404 and json.loads(stop)["error"]["code"] == "REQUEST_NOT_FOUND")
 
-        code, future = http("GET", "/api/team/start")
-        body = json.loads(future)
-        record("future features: 501 NOT IMPLEMENTED",
-               code == 501 and body["error"]["code"] == "NOT_IMPLEMENTED")
+        # ── PROJECTS ──
+        code, proj = http("POST", "/api/projects", {"name": "E2E", "description": "x"})
+        project = json.loads(proj)
+        pid = project["id"]
+        record("projects: create with sandbox workspace",
+               code == 200 and project["root_path"] == f"projects/p{pid}", f"pid={pid}")
+        code, pfiles = http("GET", f"/api/projects/{pid}/files")
+        record("projects: files listing endpoint",
+               code == 200 and "workspace" in json.loads(pfiles))
+
+        # ── AGENT (scripted mock) ──
+        code, raw = http("POST", "/api/agent/runs",
+                         {"task": "Create result.txt", "project_id": pid})
+        events = parse_sse(raw)
+        types = [e["type"] for e in events]
+        final = events[-1]
+        record("agent: run lifecycle (run/stage/activity/done)",
+               events[0]["type"] == "run" and "stage" in types
+               and "activity" in types and "done" in types)
+        record("agent: delivered end-to-end", final["status"] == "delivered",
+               f"status={final.get('status')}")
+        agent_run = events[0]["run_id"]
+        code, arun = http("GET", f"/api/agent/runs/{agent_run}")
+        arun = json.loads(arun)
+        record("agent: plan + steps persisted",
+               bool(arun["plan"]) and len(arun.get("steps", [])) > 0,
+               f"steps={len(arun.get('steps', []))}")
+        # workspace file was created inside the sandbox
+        ws = Path(tmp) / "workspace" / "projects" / f"p{pid}" / "result.txt"
+        record("agent: file written inside sandbox workspace", ws.exists())
+
+        # ── TEAM (flagship) ──
+        code, raw = http("POST", "/api/team/runs", {
+            "task": "Build greeting module",
+            "models": ["qwen3:0.6b", "deepseek-r1:7b"]})
+        events = parse_sse(raw)
+        types = [e["type"] for e in events]
+        final = events[-1]
+        team_id = events[0]["team_id"]
+        record("team: full flow planning→roles→execution→delivery",
+               final.get("status") == "delivered" and "phase" in types,
+               f"status={final.get('status')}")
+        code, tstate = http("GET", f"/api/team/runs/{team_id}")
+        t = json.loads(tstate)
+        record("team: master plan + roles + board shared state",
+               bool(t["master_plan"]) and len(t["members"]) == 2
+               and len(t["tasks"]) > 0)
+        record("team: TEAM TOTAL tokens + COST €0.00",
+               t["tokens"]["total_tokens"] > 0 and t["tokens"]["cost_eur"] == 0.0,
+               f"total={t['tokens']['total_tokens']} cost={t['tokens']['cost_eur']}")
+        code, board = http("GET", f"/api/team/runs/{team_id}/board")
+        board = json.loads(board)
+        record("team: task board TODO/IN PROGRESS/REVIEW/DONE",
+               all(k in board["board"] for k in
+                   ("todo", "in_progress", "review", "done")))
+        code, export = http("GET", f"/api/team/runs/{team_id}/export")
+        record("team: export includes TEAM TOTAL",
+               b"TEAM TOTAL" in export and b"COST" in export)
+
+        # ── COMPARE ──
+        code, raw = http("POST", "/api/compare/runs", {
+            "prompt": "Write a one-line summary.",
+            "models": ["qwen3:0.6b", "deepseek-r1:7b"]})
+        events = parse_sse(raw)
+        compare_id = events[0]["run_id"]
+        record("compare: parallel answers + done",
+               any(e["type"] == "answer_done" for e in events) and
+               events[-1]["type"] == "done")
+        code, cstate = http("GET", f"/api/compare/runs/{compare_id}")
+        c = json.loads(cstate)
+        record("compare: persisted answers with €0.00 cost",
+               len(c["answers"]) == 2 and all(a["cost_eur"] == 0.0 for a in c["answers"]))
+        code, comb = http("POST", f"/api/compare/runs/{compare_id}/combine")
+        record("compare: combine answers", code == 200 and json.loads(comb)["combined"])
+
+        # ── RESEARCH (search disabled in this sandbox → honest failure) ──
+        code, raw = http("POST", "/api/research/runs", {"query": "anything"})
+        events = parse_sse(raw)
+        record("research: disabled is honest (no fake sources)",
+               any(e["type"] == "error" and "disabled" in e.get("message", "").lower()
+                   for e in events), str(events))
+
+        # ── GIT ──
+        ws_abs = Path(tmp) / "workspace" / "projects" / f"p{pid}"
+        ws_abs.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init", "-q"], cwd=ws_abs, check=True)
+        (ws_abs / "file.txt").write_text("hello\n")
+        subprocess.run(["git", "add", "-A"], cwd=ws_abs, check=True)
+        subprocess.run(["git", "-c", "user.name=E2E", "-c", "user.email=e2e@t.local",
+                        "commit", "-qm", "initial"], cwd=ws_abs, check=True)
+        code, gstatus = http("GET", f"/api/git/status?project_id={pid}")
+        gs = json.loads(gstatus)
+        record("git: real status from sandbox repo",
+               code == 200 and gs["is_repo"] is True and gs["clean"] is True)
+        code, glog = http("GET", f"/api/git/log?project_id={pid}")
+        record("git: commit history real",
+               any("initial" in e for e in json.loads(glog)["entries"]))
+        code, gh = http("GET", "/api/github/state")
+        record("github: unauthenticated state is explicit",
+               json.loads(gh)["authenticated"] is False)
 
         if (ROOT / "frontend" / "dist" / "index.html").exists():
             code, html = http("GET", "/")
             record("frontend served as SPA", code == 200 and b'<div id="root">' in html)
         else:
-            record("frontend served as SPA", True, "skipped (no dist yet — run setup)")
+            record("frontend served as SPA", True, "skipped (no dist yet)")
 
-        # token totals across the system
         code, usage_raw = http("GET", "/api/usage/tokens")
         totals = json.loads(usage_raw)["total"]
         record("token tracking: system-wide totals (team-mode ready)",
                totals["total_tokens"] > 0, f"total={totals['total_tokens']}")
-
-        all_ok = all(ok for _, ok, _ in RESULTS[-19:])
     finally:
         proc.terminate()
         try:

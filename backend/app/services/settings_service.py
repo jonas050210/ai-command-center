@@ -19,6 +19,12 @@ _TYPES: dict[str, type] = {
     "num_ctx": int,
     "keep_alive": str,
     "custom_instructions": str,
+    "agent_max_steps": int,
+    "agent_max_fix_rounds": int,
+    "agent_cmd_timeout": float,
+    "team_max_rounds": int,
+    "search_engine": str,
+    "research_max_sources": int,
 }
 
 
@@ -33,6 +39,12 @@ class SettingsService:
             "num_ctx": str(env.ollama_num_ctx),
             "keep_alive": env.ollama_keep_alive,
             "custom_instructions": "",
+            "agent_max_steps": str(env.agent_max_steps),
+            "agent_max_fix_rounds": str(env.agent_max_fix_rounds),
+            "agent_cmd_timeout": str(env.agent_cmd_timeout),
+            "team_max_rounds": str(env.team_max_rounds),
+            "search_engine": env.search_engine,
+            "research_max_sources": str(env.research_max_sources),
         }
 
     async def get(self, key: str) -> str:
@@ -74,8 +86,20 @@ class SettingsService:
             raw = str(int(value))
             if key == "num_ctx" and int(raw) < 512:
                 raise BadRequest("num_ctx must be at least 512 tokens")
+            if key in ("agent_max_steps", "agent_max_fix_rounds", "team_max_rounds") \
+                    and int(raw) < 0:
+                raise BadRequest(f"{key} cannot be negative")
+            if key == "agent_max_steps" and int(raw) < 3:
+                raise BadRequest("agent_max_steps must be at least 3")
+            if key == "research_max_sources" and not 1 <= int(raw) <= 8:
+                raise BadRequest("research_max_sources must be between 1 and 8")
         else:
             raw = str(value)
+            if key == "search_engine" and raw.strip().lower() not in \
+                    ("duckduckgo", "disabled", "none"):
+                raise BadRequest("search_engine must be 'duckduckgo' or 'disabled'")
+            if key == "search_engine" and raw.strip().lower() == "none":
+                raw = "disabled"
         await self.repo.set(key, raw)
 
     async def as_dict(self) -> dict:

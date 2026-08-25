@@ -1,15 +1,9 @@
-"""Agent Mode — boundary module for a later phase.
+"""Agent Mode — controlled autonomous agent (PLAN → EXECUTE → VERIFY → FIX → FINALIZE).
 
-Status: NOT IMPLEMENTED. The API router exposes this boundary at
-``/api/agent`` and returns HTTP 501 so nothing ever pretends to work.
-When implemented, the agent engine will live here and will execute
-ONLY through security.permissions (capability checks) + tools.audit
-(execution logging) inside workspace/ boundaries.
+The agent acts only through the sandboxed file tools and allowlisted
+command runner; every action is audited and every model call is metered
+and cost-guarded. See ``engine.AgentEngine``.
 """
-from ..core.errors import FeatureNotImplemented
+from .engine import AgentEngine
 
-
-def unavailable() -> None:
-    raise FeatureNotImplemented(
-        "Agent Mode is NOT IMPLEMENTED in this phase. "
-        "It is a planned feature — see ROADMAP (Phase 4).")
+__all__ = ["AgentEngine"]

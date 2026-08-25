@@ -89,7 +89,8 @@ class ChatService:
     async def stream_completion(self, *, conversation_id: str | None, content: str,
                                 provider_name: str | None, model_name: str | None,
                                 system_prompt: str | None,
-                                temperature: float | None) -> AsyncIterator[dict[str, Any]]:
+                                temperature: float | None,
+                                project_id: int | None = None) -> AsyncIterator[dict[str, Any]]:
         if not content.strip():
             raise BadRequest("Message content must not be empty.")
 
@@ -112,7 +113,7 @@ class ChatService:
             title = content.strip().splitlines()[0][:60] or "New chat"
             conversation = await self.conversations.create(
                 title=title, model=model, provider=provider.name,
-                system_prompt=system_prompt)
+                system_prompt=system_prompt, project_id=project_id)
 
         user_msg = await self.messages.create(conversation["id"], "user", content)
         await self.conversations.touch(conversation["id"])
@@ -228,11 +229,6 @@ class ChatService:
         await self.conversations.add_tokens(conversation["id"], final_in, final_out)
         if status == "complete":
             await self.models.record_usage(provider.name, model, final_in, final_out, tps)
-        metrics.session_input_tokens += final_in
-        metrics.session_output_tokens += final_out
-        metrics.session_cost_eur = round(metrics.session_cost_eur + cost, 8)
-        metrics.last_request_cost_eur = cost  # type: ignore[attr-defined]
-
         if status == "error":
             yield {"type": "error", "code": "PROVIDER_ERROR", "message": error_text}
         else:
@@ -249,8 +245,15 @@ class ChatService:
     async def _auto_title(self, conversation_id: str, provider, model: str,
                           num_ctx: int, keep_alive: str, reply: str,
                           question: str) -> None:
-        """Best-effort conversation title from the real local model."""
+        """Best-effort conversation title from the real local model.
+
+        Defence in depth: the title call re-checks the CostGuard before any
+        provider traffic (same model/pricing as the already-guarded call).
+        """
         try:
+            totals = await self.usage.totals()
+            await self.guard.guard_request(provider, model, None,
+                                           total_spent_eur=totals["cost_eur"])
             prompt = (f"Write a short title (max {AUTO_TITLE_MAX_WORDS} words, plain text, "
                       f"no quotes) for a chat where the user asked: {question[:300]!r}")
             parts: list[str] = []

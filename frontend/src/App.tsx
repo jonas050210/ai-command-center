@@ -5,8 +5,13 @@ import { LeftSidebar } from "./components/LeftSidebar";
 import { RightInspector } from "./components/RightInspector";
 import { ChatView } from "./components/ChatView";
 import { ModelCenter } from "./components/ModelCenter";
+import { AgentView } from "./components/AgentView";
+import { TeamView } from "./components/TeamView";
+import { CompareView } from "./components/CompareView";
+import { ResearchView } from "./components/ResearchView";
+import { ProjectsView } from "./components/ProjectsView";
+import { GitView } from "./components/GitView";
 import { SettingsDrawer } from "./components/SettingsDrawer";
-import { NotImplemented } from "./components/NotImplemented";
 
 function Toasts() {
   const { toasts } = useStore();
@@ -31,7 +36,12 @@ export default function App() {
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
           {view === "chat" && <ChatView />}
           {view === "models" && <ModelCenter />}
-          {view !== "chat" && view !== "models" && <NotImplemented view={view} />}
+          {view === "agent" && <AgentView />}
+          {view === "team" && <TeamView />}
+          {view === "compare" && <CompareView />}
+          {view === "research" && <ResearchView />}
+          {view === "projects" && <ProjectsView />}
+          {view === "git" && <GitView />}
         </main>
         {rightOpen && view === "chat" && <RightInspector />}
       </div>

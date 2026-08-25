@@ -27,7 +27,7 @@ async def test_rename_pin_favorite_archive(api):
     assert r.json()["favorite"] is True
 
     # pinned sorts first
-    second = (await api.client.post("/api/conversations", json={"title": "X"})).json()
+    await api.client.post("/api/conversations", json={"title": "X"})
     listed = (await api.client.get("/api/conversations")).json()["conversations"]
     assert listed[0]["id"] == cid
 

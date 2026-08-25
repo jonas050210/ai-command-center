@@ -12,7 +12,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "AI Command Center"
-    version: str = "0.3.0"
+    version: str = "0.4.0"
 
     # server
     host: str = "127.0.0.1"
@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     ollama_num_ctx: int = 8192
     ollama_keep_alive: str = "10m"
     ollama_timeout: float = 300.0
+
+    # agent / team / research behavior
+    agent_max_steps: int = 20
+    agent_max_fix_rounds: int = 2
+    agent_cmd_timeout: float = 120.0
+    team_max_rounds: int = 2
+    search_engine: str = "duckduckgo"      # duckduckgo | disabled
+    research_max_sources: int = 5
 
     # ── strict €0 cost protection (HARD REQUIREMENT, on by default) ──
     free_only: bool = True            # FREE_ONLY
@@ -80,7 +88,18 @@ class Settings(BaseSettings):
 
     @property
     def resolved_workspace_root(self) -> Path:
-        return (self.workspace_root or (self.data_dir / "workspace")).resolve()
+        """Workspace root, always absolute and CWD-independent.
+
+        A relative WORKSPACE_ROOT (e.g. ``./data/workspace`` from .env) is
+        resolved against the project root, not the process CWD — otherwise
+        launching from another directory silently moves the sandbox.
+        """
+        if self.workspace_root is None:
+            return (self.data_dir / "workspace").resolve()
+        p = Path(os.path.expanduser(str(self.workspace_root)))
+        if not p.is_absolute():
+            p = PROJECT_ROOT / p
+        return p.resolve()
 
     @field_validator("data_dir", mode="before")
     @classmethod
