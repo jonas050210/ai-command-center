@@ -31,6 +31,30 @@ APP_PORT = 18123
 RESULTS: list[tuple[str, bool, str]] = []
 
 
+def base_python() -> str:
+    """Prefer the project .venv interpreter (backend deps live there)."""
+    venv = ROOT / ".venv"
+    for candidate in (venv / "Scripts" / "python.exe", venv / "bin" / "python"):
+        if candidate.exists():
+            return str(candidate)
+    return sys.executable
+
+
+def ensure_venv() -> None:
+    """Re-run this script under .venv when started with a bare interpreter.
+
+    Uses subprocess (not os.execv) so it behaves identically on Windows.
+    """
+    venv = ROOT / ".venv"
+    for candidate in (venv / "Scripts" / "python.exe", venv / "bin" / "python"):
+        if candidate.exists():
+            if Path(sys.executable).resolve() != candidate.resolve():
+                code = subprocess.call([str(candidate),
+                                        str(ROOT / "test_overall.py"), *sys.argv[1:]])
+                raise SystemExit(code)
+            return
+
+
 def record(name: str, ok: bool, detail: str = "") -> None:
     RESULTS.append((name, ok, detail))
     print(f"  {'PASS' if ok else 'FAIL'}  {name}" + (f" — {detail}" if detail else ""))
@@ -43,11 +67,7 @@ def npm_cmd() -> str | None:
 # ─────────────────────────── suites 1-3 ──────────────────────────────
 def run_backend_tests() -> bool:
     print("\n[1/4] Backend tests (pytest)")
-    python = sys.executable
-    venv = ROOT / ".venv"
-    for candidate in (venv / "Scripts" / "python.exe", venv / "bin" / "python"):
-        if candidate.exists():
-            python = str(candidate)
+    python = base_python()
     code = subprocess.call([python, "-m", "pytest", "-q"], cwd=ROOT)
     record("backend test suite", code == 0, "pytest exit=" + str(code))
     return code == 0
@@ -207,13 +227,13 @@ def run_system_tests() -> bool:
     record("mock ollama boots", True)
 
     tmp = tempfile.mkdtemp(prefix="aicc-overall-")
-    env = {**os.environ, "DATA_DIR": tmp, "HOST": "127.0.0.1", "PORT": str(APP_PORT),
+    env = {**os.environ, "DATA_DIR": tmp, "WORKSPACE_ROOT": f"{tmp}/workspace",
+           "HOST": "127.0.0.1", "PORT": str(APP_PORT),
            "OLLAMA_HOST": f"http://127.0.0.1:{MOCK_PORT}",
            "DEFAULT_MODEL": "qwen3:0.6b", "FREE_ONLY": "true", "MAX_SPEND": "0",
            "SEARCH_ENGINE": "disabled"}
-    proc = subprocess.Popen([sys.executable, "main.py"], cwd=ROOT, env=env,
+    proc = subprocess.Popen([base_python(), "main.py"], cwd=ROOT, env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    all_ok = True
     try:
         for _ in range(80):
             if proc.poll() is not None:
@@ -364,6 +384,8 @@ def run_system_tests() -> bool:
         record("compare: parallel answers + done",
                any(e["type"] == "answer_done" for e in events) and
                events[-1]["type"] == "done")
+        record("compare: real streaming deltas to the browser",
+               any(e["type"] == "delta" and e.get("content") for e in events))
         code, cstate = http("GET", f"/api/compare/runs/{compare_id}")
         c = json.loads(cstate)
         record("compare: persisted answers with €0.00 cost",
@@ -397,6 +419,26 @@ def run_system_tests() -> bool:
         record("github: unauthenticated state is explicit",
                json.loads(gh)["authenticated"] is False)
 
+        # git init endpoint (real) on a fresh project workspace
+        code, proj2 = http("POST", "/api/projects", {"name": "GitInit", "description": ""})
+        pid2 = json.loads(proj2)["id"]
+        code, init = http("POST", f"/api/git/init?project_id={pid2}")
+        record("git: init endpoint creates real repo",
+               code == 200 and json.loads(init)["ok"] is True
+               and json.loads(init)["already"] is False)
+        code, gs2 = http("GET", f"/api/git/status?project_id={pid2}")
+        record("git: freshly initialized repo visible in status",
+               code == 200 and json.loads(gs2)["is_repo"] is True)
+
+        # message editing (user edit truncates the turn)
+        code, conv2 = http("GET", f"/api/conversations/{conv_id}")
+        user_msg = next(m for m in json.loads(conv2)["messages"] if m["role"] == "user")
+        code, edit = http("PATCH", f"/api/messages/{user_msg['id']}",
+                          {"content": "edited e2e question"})
+        record("chat: edit user message truncates follow-ups",
+               code == 200 and json.loads(edit)["truncated_messages"] >= 1,
+               json.loads(edit).get("truncated_messages", "!"))
+
         if (ROOT / "frontend" / "dist" / "index.html").exists():
             code, html = http("GET", "/")
             record("frontend served as SPA", code == 200 and b'<div id="root">' in html)
@@ -416,10 +458,11 @@ def run_system_tests() -> bool:
         mock_file = ROOT / "tests" / "_overall_mock_ollama.py"
         if mock_file.exists():
             mock_file.unlink()
-    return all_ok
+    return True
 
 
 def main() -> int:
+    ensure_venv()  # re-run under .venv when needed
     parser = argparse.ArgumentParser(description="AI Command Center overall system test")
     parser.add_argument("--skip-backend", action="store_true")
     parser.add_argument("--skip-frontend", action="store_true")

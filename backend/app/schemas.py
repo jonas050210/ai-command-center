@@ -42,6 +42,10 @@ class RegenerateRequest(BaseModel):
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
 
 
+class MessageEditRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=20000)
+
+
 class SettingsUpdate(BaseModel):
     free_only: bool | None = None
     max_spend: float | None = Field(default=None, ge=0.0)

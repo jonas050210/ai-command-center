@@ -28,8 +28,8 @@ from ..tools.audit import log_execution
 log = logging.getLogger("aicc.gitops")
 
 ALLOWED_SUBCOMMANDS = {"status", "log", "branch", "diff", "show", "rev-parse",
-                       "add", "commit", "config"}
-MUTATING = {"add", "commit"}
+                       "add", "commit", "config", "init"}
+MUTATING = {"add", "commit", "init"}
 MAX_OUTPUT = 40_000
 _UA = "ai-command-center/0.4"
 
@@ -54,7 +54,8 @@ class GitService:
 
     async def repo_for(self, project_id: int | None) -> Path:
         if project_id is None:
-            path = self.workspace_root / "default"
+            # same default workspace the Agent uses for project-less runs
+            path = self.workspace_root / "projects" / "default"
             path.mkdir(parents=True, exist_ok=True)
             return path
         project = await self.projects.get(project_id)
@@ -63,20 +64,24 @@ class GitService:
         rel = project.get("root_path") or f"p{project_id}"
         return resolve_within(self.workspace_root, rel)
 
-    async def _git(self, args: list[str], repo: Path) -> dict[str, Any]:
+    async def _git(self, args: list[str], repo: Path,
+                   project_id: int | None = None) -> dict[str, Any]:
         sub = args[0].lower()
         if sub not in ALLOWED_SUBCOMMANDS:
             raise BadRequest(f"git subcommand '{sub}' is not allowed. Allowed: "
                              f"{', '.join(sorted(ALLOWED_SUBCOMMANDS))}.",
                              code="GIT_SUBCOMMAND_BLOCKED")
-        if sub in MUTATING and len(args) < 2:
-            raise BadRequest(f"git {sub} requires arguments.", code="BAD_GIT_ARGS")
         # strict argument validation (no option smuggling)
         for arg in args[1:]:
             if arg.startswith("-") and sub in ("status", "log", "branch", "diff",
                                                "show", "rev-parse"):
                 # read-only flags are fine (--porcelain, --oneline, etc.)
                 continue
+            if arg.startswith("-") and sub == "init":
+                if arg in ("-q", "--quiet"):
+                    continue
+                raise BadRequest(f"git init option '{arg}' is blocked.",
+                                 code="GIT_OPTION_BLOCKED")
             if arg.startswith("-") and sub in MUTATING:
                 if sub == "commit" and arg in ("-m", "--message"):
                     continue
@@ -87,6 +92,8 @@ class GitService:
             if "$" in arg or "`" in arg:
                 raise BadRequest("Substitutions are not allowed in git arguments.",
                                  code="GIT_ARG_BLOCKED")
+        if sub == "init" and len(args) > 1:
+            pass  # only -q/--quiet validated above
 
         cmd = ["git", *args]
         proc = await asyncio.create_subprocess_exec(
@@ -96,26 +103,36 @@ class GitService:
             stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=60)
         except asyncio.TimeoutError:
             proc.kill()
-            await self._audit(None, "timeout", "git " + " ".join(args))
+            await self._audit(project_id, "timeout", "git " + " ".join(args))
             return {"ok": False, "error": "git timed out and was killed."}
         stdout = stdout_b.decode("utf-8", errors="replace")
         stderr = stderr_b.decode("utf-8", errors="replace")
         if len(stdout) > MAX_OUTPUT:
             stdout = stdout[:MAX_OUTPUT] + "\n… [truncated]"
         ok = proc.returncode == 0
-        await self._audit(None, "success" if ok else "error", "git " + " ".join(args),
+        await self._audit(project_id, "success" if ok else "error",
+                          "git " + " ".join(args),
                           stdout[-1500:] + stderr[-1500:])
         return {"ok": ok, "exit_code": proc.returncode, "stdout": stdout,
                 "stderr": stderr}
 
     # ── API surface ──────────────────────────────────────────────────
+    async def init(self, project_id: int | None) -> dict[str, Any]:
+        """Initialize a real git repository in the sandboxed workspace."""
+        repo = await self.repo_for(project_id)
+        if (repo / ".git").exists():
+            return {"ok": True, "already": True, "path": str(repo)}
+        r = await self._git(["init", "-q"], repo, project_id)
+        return {"ok": r["ok"], "already": False, "path": str(repo),
+                "error": None if r["ok"] else (r["stderr"] or r["stdout"]).strip()}
+
     async def status(self, project_id: int | None) -> dict[str, Any]:
         repo = await self.repo_for(project_id)
-        r = await self._git(["rev-parse", "--is-inside-work-tree"], repo)
+        r = await self._git(["rev-parse", "--is-inside-work-tree"], repo, project_id)
         if not r["ok"]:
             return {"ok": False, "is_repo": False, "path": str(repo),
                     "detail": (r["stderr"] or r["stdout"]).strip()}
-        res = await self._git(["status", "--porcelain=v1", "--branch"], repo)
+        res = await self._git(["status", "--porcelain=v1", "--branch"], repo, project_id)
         branch = "detached"
         clean = True
         lines = res["stdout"].splitlines()
@@ -130,13 +147,14 @@ class GitService:
 
     async def log(self, project_id: int | None, limit: int = 20) -> dict[str, Any]:
         repo = await self.repo_for(project_id)
-        r = await self._git(["log", f"--max-count={int(limit)}", "--oneline"], repo)
+        r = await self._git(["log", f"--max-count={int(limit)}", "--oneline"], repo,
+                            project_id)
         return {"ok": r["ok"], "entries": r["stdout"].splitlines() or [],
                 "error": None if r["ok"] else r["stderr"].strip()}
 
     async def branches(self, project_id: int | None) -> dict[str, Any]:
         repo = await self.repo_for(project_id)
-        r = await self._git(["branch", "-a"], repo)
+        r = await self._git(["branch", "-a"], repo, project_id)
         return {"ok": r["ok"], "branches": r["stdout"].splitlines() or [],
                 "error": None if r["ok"] else r["stderr"].strip()}
 
@@ -144,7 +162,7 @@ class GitService:
         repo = await self.repo_for(project_id)
         args = ["diff", "--cached" if cached else "", "--stat", "--patch",
                 "--no-color"]
-        r = await self._git([a for a in args if a], repo)
+        r = await self._git([a for a in args if a], repo, project_id)
         return {"ok": r["ok"], "diff": r["stdout"],
                 "error": None if r["ok"] else r["stderr"].strip()}
 
@@ -162,28 +180,30 @@ class GitService:
                 chosen.append(resolve_within(repo, p).relative_to(repo).as_posix())
         else:
             chosen = ["--all"]
-        stage = await self._git(["add"] + chosen, repo)
+        stage = await self._git(["add"] + chosen, repo, project_id)
         if not stage["ok"]:
             return {"ok": False, "error": stage["stderr"].strip()}
-        who = await self._ensure_identity(repo)
-        msg = await self._git(["commit", "-m", message], repo)
+        who = await self._ensure_identity(repo, project_id)
+        msg = await self._git(["commit", "-m", message], repo, project_id)
         return {"ok": msg["ok"], "identity": who,
                 "commit": msg["stdout"].strip(),
                 "error": None if msg["ok"] else msg["stderr"].strip()}
 
-    async def _ensure_identity(self, repo: Path) -> dict[str, str | None]:
-        name_cfg = await self._git(["config", "user.name"], repo)
-        email_cfg = await self._git(["config", "user.email"], repo)
+    async def _ensure_identity(self, repo: Path,
+                               project_id: int | None = None) -> dict[str, str | None]:
+        name_cfg = await self._git(["config", "user.name"], repo, project_id)
+        email_cfg = await self._git(["config", "user.email"], repo, project_id)
         name = name_cfg["stdout"].strip() if name_cfg["ok"] else None
         email = email_cfg["stdout"].strip() if email_cfg["ok"] else None
         if not (name and email):
             await self._git(["config", "user.name",
-                             name or os.environ.get("GIT_AUTHOR_NAME", "AI Command Center")],
-                            repo)
+                             name or os.environ.get("GIT_AUTHOR_NAME",
+                                                    "AI Command Center")],
+                            repo, project_id)
             await self._git(["config", "user.email",
                              email or os.environ.get("GIT_AUTHOR_EMAIL",
                                                      "ai-command-center@localhost")],
-                            repo)
+                            repo, project_id)
             name = name or "AI Command Center"
             email = email or "ai-command-center@localhost"
         return {"name": name, "email": email}

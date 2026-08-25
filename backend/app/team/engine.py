@@ -88,10 +88,6 @@ class TeamEngine:
         self.usage = usage
 
     # ── role assignment ──────────────────────────────────────────────
-    def available_models(self) -> list[str]:
-        """Only local/free models are allowed (guarded later anyway)."""
-        return []
-
     async def _assign_roles(self, team_id: int, model_names: list[str],
                             overrides: dict[str, str] | None) -> list[dict]:
         rows = {}
@@ -264,7 +260,6 @@ class TeamEngine:
                 task_ids.append(t["id"])
                 await self.teams.add_event(sid, "execution", "status",
                                            f"board: {title} → {assignee}")
-            await self._emit_board(sid)
 
             # ── EXECUTION: each member produces its work product ──
             await self.teams.update(sid, status="executing")
@@ -283,7 +278,6 @@ class TeamEngine:
                     trow = await self._task(sid, task_id)
                     if (trow or {}).get("assignee") == name and trow["status"] == "todo":
                         await self.teams.update_task(task_id, status="in_progress")
-                await self._emit_board(sid)
                 product = await self._produce(name, provider_name, task, master_plan,
                                               roles, analyses, sinks[name])
                 await self.teams.update_member(member_id, status="idle")
@@ -297,7 +291,6 @@ class TeamEngine:
                     if (trow or {}).get("assignee") == name:
                         await self.teams.update_task(task_id, status="review",
                                                      progress=100)
-                await self._emit_board(sid)
 
             if cancel.is_set():
                 await self._finish_cancelled(sid)
@@ -358,7 +351,6 @@ class TeamEngine:
                     trow = await self._task(sid, task_id)
                     if (trow or {}).get("status") == "review":
                         await self.teams.update_task(task_id, status="done", progress=100)
-                await self._emit_board(sid)
 
             # ── FINAL REVIEW + DELIVERY ──
             await self.teams.update(sid, status="final")
@@ -375,7 +367,6 @@ class TeamEngine:
                     await self.teams.update_task(task_id, status="done", progress=100)
             await self.teams.add_event(sid, "delivery", "deliverable",
                                        _trim(deliverable, 3000), actor=orchestrator)
-            await self._emit_board(sid)
             yield {"type": "tokens", "team_id": sid,
                    "members": await self._token_rows(sid),
                    "total": await self.teams.token_totals(sid)}
@@ -410,10 +401,6 @@ class TeamEngine:
             if t["id"] == task_id:
                 return t
         return None
-
-    async def _emit_board(self, team_id: int) -> None:
-        # board is emitted by callers as an event dict
-        pass
 
     def _assignee_for(self, title: str, assigned: dict[str, list[str]],
                       model_names: list[str]) -> str:

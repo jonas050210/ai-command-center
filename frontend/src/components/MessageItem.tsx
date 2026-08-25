@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { ChatMessageData } from "../types";
 import { cx, copyText, formatNumber } from "../utils";
 import { Markdown } from "./Markdown";
-import { AlertIcon, BotIcon, CheckIcon, CopyIcon, RefreshIcon } from "../icons";
+import { AlertIcon, BotIcon, CheckIcon, CopyIcon, EditIcon, RefreshIcon } from "../icons";
 
 export function TokenChip({ msg }: { msg: ChatMessageData }) {
   if (msg.role !== "assistant" || msg.input_tokens == null) return null;
@@ -20,28 +20,74 @@ export function TokenChip({ msg }: { msg: ChatMessageData }) {
   );
 }
 
-export function MessageItem({ msg, isLast, onRegenerate }: {
+export function MessageItem({ msg, isLast, onRegenerate, onEdit }: {
   msg: ChatMessageData;
   isLast: boolean;
   onRegenerate: (messageId: string) => void;
+  onEdit?: (messageId: string, content: string) => Promise<void>;
 }) {
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(msg.content);
+  const [saving, setSaving] = useState(false);
+
+  const commitEdit = async () => {
+    if (!onEdit || saving) return;
+    const text = draft.trim();
+    if (!text) return;
+    setSaving(true);
+    try {
+      await onEdit(msg.id, text);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (msg.role === "user") {
     return (
       <div className="anim-fade-up flex justify-end px-6 py-1.5">
-        <div className="max-w-[78%]">
-          <div className="rounded-2xl rounded-br-md px-4 py-2.5 text-[13.5px] leading-relaxed
-            bg-[rgba(69,227,255,0.1)] border border-[rgba(69,227,255,0.2)] whitespace-pre-wrap break-words">
-            {msg.content}
-          </div>
+        <div className="max-w-[78%] min-w-[120px]">
+          {editing ? (
+            <div className="glass-soft rounded-2xl p-2.5">
+              <textarea className="input !text-[13px] resize-none" rows={3} autoFocus
+                value={draft} onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void commitEdit();
+                  if (e.key === "Escape") { setEditing(false); setDraft(msg.content); }
+                }} />
+              <div className="flex items-center gap-1.5 mt-2">
+                <button className="btn !text-[11px] !py-1 !px-2.5 btn-accent" disabled={saving || !draft.trim()}
+                  onClick={() => void commitEdit()}>{saving ? "Saving…" : "Save"}</button>
+                <button className="btn btn-ghost !text-[11px] !py-1 !px-2.5"
+                  onClick={() => { setEditing(false); setDraft(msg.content); }}>Cancel</button>
+                <span className="text-[9px] text-faint ml-auto">editing rewrites this turn (messages after it are removed)</span>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl rounded-br-md px-4 py-2.5 text-[13.5px] leading-relaxed
+              bg-[rgba(69,227,255,0.1)] border border-[rgba(69,227,255,0.2)] whitespace-pre-wrap break-words">
+              {msg.content}
+            </div>
+          )}
           <div className="flex justify-end mt-1 opacity-0 hover:opacity-100 transition-opacity">
-            <button className="icon-btn !w-6 !h-6" title="Copy"
-              onClick={async () => {
-                if (await copyText(msg.content)) { setCopied(true); window.setTimeout(() => setCopied(false), 1200); }
-              }}>
-              {copied ? <CheckIcon className="w-3 h-3 text-good" /> : <CopyIcon className="w-3 h-3" />}
-            </button>
+            {!editing && (
+              <button className="icon-btn !w-6 !h-6" title="Edit message"
+                onClick={() => { setDraft(msg.content); setEditing(true); }}>
+                <EditIcon className="w-3 h-3" />
+              </button>
+            )}
+            {!editing && (
+              <button className="icon-btn !w-6 !h-6" title="Copy"
+                onClick={async () => {
+                  if (await copyText(msg.content)) { setCopied(true); window.setTimeout(() => setCopied(false), 1200); }
+                }}>
+                {copied ? <CheckIcon className="w-3 h-3 text-good" /> : <CopyIcon className="w-3 h-3" />}
+              </button>
+            )}
+            {editing && (
+              <span className="text-[9.5px] text-faint mr-1">Esc cancels</span>
+            )}
           </div>
         </div>
       </div>
@@ -64,6 +110,12 @@ export function MessageItem({ msg, isLast, onRegenerate }: {
         {failed && <span className="chip chip-bad !text-[9.5px]">error</span>}
         <div className="flex-1" />
         <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
+          {onEdit && (
+            <button className="icon-btn !w-6 !h-6" title="Edit response"
+              onClick={() => { setDraft(msg.content); setEditing(true); }}>
+              <EditIcon className="w-3 h-3" />
+            </button>
+          )}
           <button className="icon-btn !w-6 !h-6" title="Copy response"
             onClick={async () => {
               if (await copyText(msg.content)) { setCopied(true); window.setTimeout(() => setCopied(false), 1200); }
@@ -95,7 +147,23 @@ export function MessageItem({ msg, isLast, onRegenerate }: {
       )}
 
       <div className="pl-7">
-        {msg.content ? <Markdown content={msg.content} /> :
+        {editing ? (
+          <div className="glass-soft rounded-xl p-2.5">
+            <textarea className="input !text-[12.5px] resize-none" rows={6} autoFocus
+              value={draft} onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void commitEdit();
+                if (e.key === "Escape") { setEditing(false); setDraft(msg.content); }
+              }} />
+            <div className="flex items-center gap-1.5 mt-2">
+              <button className="btn !text-[11px] !py-1 !px-2.5 btn-accent" disabled={saving || !draft.trim()}
+                onClick={() => void commitEdit()}>{saving ? "Saving…" : "Save"}</button>
+              <button className="btn btn-ghost !text-[11px] !py-1 !px-2.5"
+                onClick={() => { setEditing(false); setDraft(msg.content); }}>Cancel</button>
+              <span className="text-[9px] text-faint ml-auto">saves the corrected response in place</span>
+            </div>
+          </div>
+        ) : msg.content ? <Markdown content={msg.content} /> :
           !failed && <span className="text-faint text-[12px] italic">Empty response</span>}
       </div>
     </div>

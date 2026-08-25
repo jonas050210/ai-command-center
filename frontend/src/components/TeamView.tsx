@@ -72,7 +72,9 @@ export function TeamView() {
     try {
       await streamSSE<TeamEventStream>("/api/team/runs", {
         task: task.trim(), models: selected,
-        roles: Object.fromEntries(Object.entries(roles).filter(([, v]) => v && selected.includes(v)) as never) as Record<string, string> || undefined,
+        roles: Object.fromEntries(
+          Object.entries(roles).filter(([m, v]) => v && selected.includes(m)),
+        ) as Record<string, string>,
       }, (ev) => {
         if (ev.type === "team") {
           setTeamId(ev.team_id);

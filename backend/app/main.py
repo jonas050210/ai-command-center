@@ -101,8 +101,9 @@ def build_services(settings: Settings) -> Services:
                                settings_service)
     chat = ChatService(conversations=conversations_repo, messages=messages_repo,
                        usage=usage_repo, models=models_repo, router=router,
-                       guard=guard, settings=settings_service, requests=requests)
-    models_service = ModelsService(models_repo, providers_repo)
+                       guard=guard, settings=settings_service, requests=requests,
+                       runner=model_runner)
+    models_service = ModelsService(models_repo, providers_repo, runner=model_runner)
 
     vault = CredentialVault(settings)
     projects_repo = ProjectsRepo(db)
@@ -177,8 +178,9 @@ def create_app(settings: Settings | None = None, *, seed: bool = False) -> FastA
         return await call_next(request)
 
     from ..app.routers import (agent, chat, compare, conversations, costs, git,
-                               health, models, projects, providers, research,
-                               settings as settings_router, system, team)
+                               health, messages, models, projects, providers,
+                               research, settings as settings_router, system,
+                               team)
 
     app.include_router(health.router, prefix="/api")
     app.include_router(system.router, prefix="/api")
@@ -187,6 +189,7 @@ def create_app(settings: Settings | None = None, *, seed: bool = False) -> FastA
     app.include_router(providers.router, prefix="/api")
     app.include_router(models.router, prefix="/api")
     app.include_router(conversations.router, prefix="/api")
+    app.include_router(messages.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
     app.include_router(agent.router, prefix="/api")
     app.include_router(team.router, prefix="/api")

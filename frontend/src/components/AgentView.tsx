@@ -20,6 +20,7 @@ export function AgentView() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [runId, setRunId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<AgentRun | null>(null);
   const [tokens, setTokens] = useState({ input: 0, output: 0, cost: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<AbortController | null>(null);
@@ -165,12 +166,49 @@ export function AgentView() {
             <div className="text-[11.5px] text-faint py-6 text-center">No runs yet.</div>
           ) : (
             <div className="space-y-1.5 max-h-[420px] overflow-y-auto">
-              {runs.map((r) => (
+              {detail && (
+          <div className="glass-soft rounded-lg px-3 py-2.5 mb-2 border border-line">
+            <div className="flex items-center gap-2">
+              <span className="text-[11.5px] font-semibold text-ink">Run #{detail.id} — {detail.stage} · {detail.status}</span>
+              <button className="icon-btn !w-6 !h-6 ml-auto" title="Close"
+                onClick={() => setDetail(null)}>×</button>
+            </div>
+            <div className="text-[10px] text-faint mt-1">workspace: {detail.workspace}</div>
+            {detail.plan && (
+              <div className="mt-2">
+                <div className="micro-label">Plan</div>
+                <div className="text-[10.5px] text-dim font-mono whitespace-pre-wrap max-h-[140px] overflow-y-auto">{detail.plan}</div>
+              </div>
+            )}
+            {detail.summary && (
+              <div className="mt-2">
+                <div className="micro-label">Summary</div>
+                <div className="text-[10.5px] text-dim whitespace-pre-wrap">{detail.summary}</div>
+              </div>
+            )}
+            {detail.error && <div className="text-[10.5px] text-bad mt-1">{detail.error}</div>}
+            {(detail.steps?.length ?? 0) > 0 && (
+              <div className="mt-2">
+                <div className="micro-label">Steps · {detail.steps!.length}</div>
+                <div className="max-h-[160px] overflow-y-auto space-y-0.5 mt-1">
+                  {detail.steps!.map((s) => (
+                    <div key={s.id} className="text-[10px] font-mono text-dim">
+                      <span className={s.status === "error" ? "text-bad" : "text-good"}>[{s.stage}]</span>{" "}
+                      {s.tool} {s.target ?? ""} — {s.summary.slice(0, 120)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {runs.map((r) => (
                 <button key={r.id} className="w-full text-left glass-soft rounded-lg px-3 py-2 hover:bg-hover"
-                  onClick={() => {
-                    const show = window.prompt(r.status !== "delivered" ? r.summary || r.error || r.plan || " " : r.summary);
-                    if (show !== null) window.alert(`#${r.id} · ${r.status} · ${r.stage}\n\n${r.summary || r.plan || r.task}`);
-                  }}>
+                  onClick={() => void (async () => {
+                    try {
+                      setDetail(await getJSON<AgentRun>(`/api/agent/runs/${r.id}`));
+                    } catch (e) { /* offline */ }
+                  })()}>
                   <div className="flex items-center gap-2">
                     <BotIcon className="w-3.5 h-3.5 text-accent shrink-0" />
                     <span className="text-[12px] font-semibold text-ink truncate flex-1">{r.task.slice(0, 80)}</span>

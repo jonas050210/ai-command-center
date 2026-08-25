@@ -19,7 +19,7 @@ interface StreamState {
 export function ChatView() {
   const {
     activeId, setActiveId, activeConv, setActiveConv, refreshConversations,
-    refreshCosts, refreshTokens, refreshModels, system, settings,
+    refreshCosts, refreshTokens, refreshModels, system, settings, notify,
   } = useStore();
 
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
@@ -168,6 +168,26 @@ export function ChatView() {
     void consume("/api/chat/regenerate", { message_id: messageId });
   }, [consume]);
 
+  const editMessage = useCallback(async (messageId: string, content: string) => {
+    try {
+      const res = await sendJSON<{ conversation: { id: string } }>(
+        "PATCH", `/api/messages/${messageId}`, { content });
+      if (res.conversation?.id) {
+        const conv = await getJSON<ConversationData>(
+          `/api/conversations/${res.conversation.id}`);
+        setActiveConv(conv);
+        setMessages(conv.messages ?? []);
+      }
+      void refreshConversations();
+      void refreshCosts();
+      void refreshTokens();
+      notify("Message updated.", "good");
+    } catch (e) {
+      setBannerError({ code: "EDIT_FAILED", message: e instanceof Error ? e.message : "Edit failed" });
+      notify(e instanceof Error ? e.message : "Edit failed", "bad");
+    }
+  }, [setActiveConv, refreshConversations, refreshCosts, refreshTokens, notify]);
+
   const stop = useCallback(() => {
     const reqId = stream?.requestId;
     abortRef.current?.abort();
@@ -239,7 +259,8 @@ export function ChatView() {
         {messages.map((msg) => (
           <MessageItem key={msg.id} msg={msg}
             isLast={msg.id === lastAssistantId && !stream}
-            onRegenerate={regenerate} />
+            onRegenerate={regenerate}
+            onEdit={editMessage} />
         ))}
 
         {stream && <StreamingBubble content={stream.content} model={stream.model || "assistant"} />}

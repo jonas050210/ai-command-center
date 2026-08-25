@@ -5,14 +5,13 @@ cannot be determined stay ``None`` → the UI renders "Unknown".
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from typing import Any
 
-from ..core.errors import NotFound
+from ..core.errors import NotFound, BadRequest, ProviderError
 from ..db.repo import ModelsRepo, ProvidersRepo
-from ..providers.base import ChatMessage, ChatOptions, Provider
+from ..providers.base import ChatMessage, Provider
 from .model_router import classify_model
 
 log = logging.getLogger("aicc.models")
@@ -21,9 +20,10 @@ TEST_PROMPT = "Reply with exactly: OK"
 
 
 class ModelsService:
-    def __init__(self, models: ModelsRepo, providers: ProvidersRepo):
+    def __init__(self, models: ModelsRepo, providers: ProvidersRepo, runner=None):
         self.models = models
         self.providers = providers
+        self.runner = runner
 
     async def sync_from_provider(self, provider: Provider) -> dict:
         """Discover models from the runtime and upsert them."""
@@ -60,30 +60,31 @@ class ModelsService:
 
     async def test_model(self, provider: Provider, name: str,
                          num_ctx: int, keep_alive: str) -> dict[str, Any]:
-        """Run one real inference and measure throughput (tokens/sec)."""
+        """Run one real inference and measure throughput (tokens/sec).
+
+        Goes through ModelRunner — CostGuard runs BEFORE any provider
+        network request and token/cost accounting lands in the usage
+        ledger exactly like every other model call.
+        """
         row = await self.models.get(provider.name, name)
         if row is None:
             raise NotFound(f"Model '{name}' is not in the catalog. Refresh first.")
+        if self.runner is None:
+            raise BadRequest("Model runner is not wired.", code="MODEL_RUNNER_MISSING")
         t0 = time.monotonic()
-        final = None
-        cancel = asyncio.Event()
-        async for chunk in provider.chat_stream(
-                name, [ChatMessage(role="user", content=TEST_PROMPT)],
-                ChatOptions(num_ctx=num_ctx, keep_alive=keep_alive), cancel):
-            if chunk.done:
-                final = chunk
+        gen = await self.runner.generate(
+            messages=[ChatMessage(role="user", content=TEST_PROMPT)],
+            provider_name=provider.name, model_name=name,
+            num_ctx=num_ctx, keep_alive=keep_alive)
         latency_ms = round((time.monotonic() - t0) * 1000, 1)
-        out_tok = final.output_tokens if final else None
-        in_tok = final.input_tokens if final else None
-        tps = final.output_tps if final else None
-        if out_tok is None and final is not None:
-            out_tok = None  # runtime didn't report → stay honest
-        await self.models.record_usage(provider.name, name, in_tok or 0, out_tok or 0, tps)
+        if gen.status == "error":
+            raise ProviderError(f"Model test failed: {gen.error}",
+                                details={"model": name})
         return {
             "model": name, "provider": provider.name,
-            "tokens_per_second": round(tps, 1) if tps else None,
+            "tokens_per_second": round(gen.tokens_per_second, 1) if gen.tokens_per_second else None,
             "latency_ms": latency_ms,
-            "input_tokens": in_tok, "output_tokens": out_tok,
-            "token_method": "exact" if (in_tok is not None and out_tok is not None) else "estimated",
-            "cost_eur": 0.0,
+            "input_tokens": gen.input_tokens, "output_tokens": gen.output_tokens,
+            "token_method": gen.token_method,
+            "cost_eur": gen.cost_eur,
         }

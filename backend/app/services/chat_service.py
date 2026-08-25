@@ -21,6 +21,7 @@ from ..observability.metrics import metrics
 from ..providers.base import ChatMessage, ChatOptions
 from .cost_guard import CostGuard
 from .model_router import ModelRouter
+from .model_runner import UsageSink
 from .settings_service import SettingsService
 from .tokens import estimate_tokens
 
@@ -30,10 +31,16 @@ AUTO_TITLE_MAX_WORDS = 6
 
 
 class RequestManager:
-    """Tracks in-flight chat streams so /api/chat/stop can cancel them."""
+    """Tracks in-flight chat streams so /api/chat/stop can cancel them.
+
+    Also owns fire-and-forget background work (e.g. conversation auto-title)
+    so it can be settled/cancelled deterministically at shutdown instead of
+    leaking a task into a closed event loop.
+    """
 
     def __init__(self):
         self._active: dict[str, asyncio.Event] = {}
+        self._background: set[asyncio.Task] = set()
 
     def start(self, request_id: str) -> asyncio.Event:
         event = asyncio.Event()
@@ -50,12 +57,34 @@ class RequestManager:
         event.set()
         return True
 
+    def spawn(self, coro) -> asyncio.Task:
+        """Run background work tracked for lifecycle management."""
+        task = asyncio.create_task(coro)
+        self._background.add(task)
+        task.add_done_callback(self._background.discard)
+        return task
+
+    async def shutdown(self, timeout: float = 5.0) -> None:
+        """Wait for background tasks (bounded), then cancel leftovers."""
+        if not self._background:
+            return
+        pending = list(self._background)
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*pending, return_exceptions=True), timeout=timeout)
+        except asyncio.TimeoutError:
+            for task in pending:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+        self._background.clear()
+
 
 class ChatService:
     def __init__(self, *, conversations: ConversationsRepo, messages: MessagesRepo,
                  usage: UsageRepo, models: ModelsRepo, router: ModelRouter,
                  guard: CostGuard, settings: SettingsService,
-                 requests: RequestManager):
+                 requests: RequestManager, runner=None):
         self.conversations = conversations
         self.messages = messages
         self.usage = usage
@@ -64,6 +93,7 @@ class ChatService:
         self.guard = guard
         self.settings = settings
         self.requests = requests
+        self.runner = runner
 
     # ── helpers ──────────────────────────────────────────────────────
     async def _build_history(self, conversation: dict,
@@ -238,33 +268,31 @@ class ChatService:
                    "cost_eur": cost}
             yield {"type": "done", "assistant_message_id": assistant["id"], "status": status}
             if auto_title and status == "complete":
-                asyncio.create_task(self._auto_title(conversation["id"], provider, model,
-                                                     num_ctx, keep_alive, content,
-                                                     history[-1].content if history else ""))
+                question = history[-1].content if history else ""
+                self.requests.spawn(self._auto_title(conversation["id"], provider, model,
+                                                     num_ctx, keep_alive, question))
 
     async def _auto_title(self, conversation_id: str, provider, model: str,
-                          num_ctx: int, keep_alive: str, reply: str,
-                          question: str) -> None:
+                          num_ctx: int, keep_alive: str, question: str) -> None:
         """Best-effort conversation title from the real local model.
 
-        Defence in depth: the title call re-checks the CostGuard before any
-        provider traffic (same model/pricing as the already-guarded call).
+        Goes through ModelRunner: CostGuard before any provider traffic AND
+        exact/estimated token accounting in the usage ledger + session
+        metrics (same as every other model call). Runs as a tracked
+        background task, settled/cancelled safely at shutdown.
         """
         try:
-            totals = await self.usage.totals()
-            await self.guard.guard_request(provider, model, None,
-                                           total_spent_eur=totals["cost_eur"])
             prompt = (f"Write a short title (max {AUTO_TITLE_MAX_WORDS} words, plain text, "
                       f"no quotes) for a chat where the user asked: {question[:300]!r}")
-            parts: list[str] = []
-            async for chunk in provider.chat_stream(
-                    model, [ChatMessage(role="user", content=prompt)],
-                    ChatOptions(num_ctx=num_ctx, keep_alive=keep_alive), asyncio.Event()):
-                if chunk.content:
-                    parts.append(chunk.content)
-                if chunk.done:
-                    break
-            title = " ".join("".join(parts).strip().split())[:60].strip(' ".*#`')
+            if self.runner is not None:
+                gen = await self.runner.generate(
+                    messages=[ChatMessage(role="user", content=prompt)],
+                    provider_name=provider.name, model_name=model,
+                    num_ctx=num_ctx, keep_alive=keep_alive,
+                    sink=UsageSink(conversation_id=conversation_id))
+                title = " ".join(gen.text.strip().split())[:60].strip(' ".*#`')
+            else:  # pragma: no cover — runner is always wired in the app
+                title = ""
             if title:
                 await self.conversations.update(conversation_id, title=title)
                 log.info("auto-titled conversation %s → %s", conversation_id, title)

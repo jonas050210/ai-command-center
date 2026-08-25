@@ -11,6 +11,12 @@ log = logging.getLogger("aicc.api.git")
 router = APIRouter(tags=["git"])
 
 
+@router.post("/git/init")
+async def git_init(request: Request, project_id: int | None = None) -> dict:
+    svc = request.app.state.services
+    return await svc.git.init(project_id)
+
+
 @router.get("/git/status")
 async def git_status(request: Request, project_id: int | None = None) -> dict:
     svc = request.app.state.services

@@ -103,9 +103,18 @@ export function GitView() {
   };
 
   const initRepo = async () => {
-    if (pid == null) return;
-    // init is handled by the git service on first status; report honestly
-    notify("Git init: create a repo by running 'git init' in the project workspace, or use Agent Mode.", "info");
+    try {
+      const r = await sendJSON<{ ok: boolean; already?: boolean; error?: string }>(
+        "POST", `/api/git/init${pid != null ? `?project_id=${pid}` : ""}`);
+      if (r.ok) {
+        notify(r.already ? "Already a git repository." : "Repository initialized in the sandboxed workspace.", "good");
+        void loadGit(pid);
+      } else {
+        notify(r.error ?? "Git init failed", "bad");
+      }
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Git init failed", "bad");
+    }
   };
 
   return (
@@ -119,7 +128,8 @@ export function GitView() {
 
       <Panel title="Local repository" sub="Choose a project workspace (or the default one) to inspect and commit"
         right={pid != null && (
-          <button className="btn !text-[10.5px] !py-1 !px-2" onClick={initRepo}>Init</button>
+          <button className="btn !text-[10.5px] !py-1 !px-2" onClick={() => void initRepo()}
+            title="Initialize a real git repository in this workspace">Init</button>
         )}>
         <div className="flex items-center gap-2 mb-3">
           <select className="input cursor-pointer" value={pid ?? ""}

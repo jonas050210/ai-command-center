@@ -10,17 +10,17 @@ Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Pytho
 
 | Area | Capabilities |
 |---|---|
-| **Chat** | Conversations (search, folders-by-pin, rename, delete, archive, pin, favorites), real SSE streaming from Ollama, stop, retry, regenerate, markdown + GFM tables + task lists, syntax-highlighted code with per-block copy, model selector, per-chat system prompt, global custom instructions, token counters (exact/estimated), context-usage meter, clear error states, auto-titles from the local model |
+| **Chat** | Conversations (search, folders-by-pin, rename, delete, archive, pin, favorites), real SSE streaming from Ollama, stop, retry, regenerate, **edit user messages (re-branches the turn) and assistant responses (in-place)**, markdown + GFM tables + task lists, syntax-highlighted code with per-block copy, model selector, per-chat system prompt (clearable), global custom instructions, token counters (exact/estimated), context-usage meter, clear error states, auto-titles from the local model (metered + guarded like every call) |
 | **Ollama** | running/unavailable/timeout detection, installed-model discovery, context length + capabilities from `/api/show`, real streaming chat, safe pull (live progress) & delete, measured speed tests |
 | **Model Center** | live catalog, search, category filters (10), sorting, favorites, recently used, selection, speed test, pull/delete, usage + measured tok/s. Unknown = "Unknown" — never faked |
 | **Agent Mode** | real controlled agent: PLAN → EXECUTE → VERIFY → FIX → FINALIZE. Tools: read/write/edit file, search, list, mkdir, delete file, allowlisted commands (`pytest`, `npm run …`, `tsc`, …). Security: workspace sandbox (blocks absolute paths, `..` / `..\` traversal, symlink escapes), no shell (argv-only, metacharacters rejected), command + subcommand allowlists, argument escape checks, hard timeouts, full execution auditing, per-step + token persistence |
 | **Team Mode (flagship)** | 2–4 models: TASK → PLANNING (every model analyzes requirements/architecture/risks/dependencies/subtasks/testing/tools) → MASTER PLAN → ROLE ASSIGNMENT (Architect/Developer/QA/Security Reviewer/Researcher/Documentation, auto by capabilities with manual overrides) → EXECUTION → REVIEW → FIX → FINAL REVIEW → DELIVERY. Shared state: task, master plan, decisions, work products, findings, errors on a live board (TODO/IN PROGRESS/REVIEW/DONE with manual override). Per-model tokens + **TEAM TOTAL** + **COST €0.00**. Sequential on one GPU. No chain-of-thought exposed — decisions/actions/findings/status only |
-| **Compare Mode** | N models answer one prompt side-by-side with streaming, per-answer token usage, select best answer, combine answers via local model, persisted runs |
+| **Compare Mode** | N models answer one prompt side-by-side with **live streaming of every delta to the browser**, per-answer token usage, select best answer, combine answers via local model, persisted runs |
 | **Research Mode** | real multi-source search (DuckDuckGo, configurable / disable-able), source list with URLs + snippets + fetched excerpts, optional local-model summary/comparison with `[n]` citations, markdown export. Zero fabricated sources: failures are honest |
 | **Projects** | first-class objects with sandboxed workspaces, linked chats, files (rescanned from disk), tasks, settings JSON; Agent & Team runs can target a project |
-| **Git/GitHub** | real Git (status/branch/log/diff/add/commit) inside sandboxed project workspaces — argv-only, subcommand allowlist, audited. GitHub REST (repos/issues/PRs, issue creation) only when a token exists (env `GITHUB_TOKEN` or encrypted vault credential); otherwise an explicit unauthenticated state — never faked |
+| **Git/GitHub** | real Git (init/status/branch/log/diff/add/commit) inside sandboxed project workspaces — argv-only, subcommand allowlist, audited. GitHub REST (repos/issues/PRs, issue creation) only when a token exists (env `GITHUB_TOKEN` or encrypted vault credential); otherwise an explicit unauthenticated state — never faked |
 | **€0 CostGuard** | `FREE_ONLY=true`, `MAX_SPEND=0.00` by default. Every model call — chat, auto-title, agent, team, compare, research synthesis — is blocked server-side **before any network request** if it costs money. Exact message: *"Paid model blocked. Free-only mode is enabled. No money was spent."* No paid fallback exists anywhere |
-| **Security** | Fernet-encrypted credentials (key in `data/secret.key`, 0600 or `AI_CC_SECRET_KEY`), path-containment sandbox (POSIX + Windows escapes), deny-by-default permission policy, command allowlist + subcommand allowlist, shell injection protection, process timeouts, audit log (`executions` + per-mode tables), localhost binding |
+| **Security** | Fernet-encrypted credentials (key in `data/secret.key`, 0600 or `AI_CC_SECRET_KEY`), path-containment sandbox (POSIX `..`/absolute, Windows `..\\`/drive/UNC escapes, symlink escapes), deny-by-default permission policy, command allowlist + subcommand allowlist (no `npx`/`npm exec`/`npm install` — no network code execution), shell injection protection, process timeouts, audit log (`executions` + per-mode tables), localhost binding |
 | **Observability** | JSON logs (`data/logs/app.log`), session metrics, exact/estimated label integrity, per-model & system-wide token usage |
 
 ## Quick start
@@ -38,7 +38,7 @@ ollama pull qwen3:0.6b        # default model, fully configurable
 ```
 
 `python start.py --check-only` verifies the environment without starting.
-`python test_overall.py` runs all four suites: backend tests → frontend type checking → frontend production build → end-to-end system tests (real server, mock Ollama, all modes).
+`python test_overall.py` runs all four suites: backend tests → frontend type checking → frontend production build → end-to-end system tests (real server, mock Ollama, all modes). It re-runs itself under `.venv` automatically, so `python test_overall.py` works even without global dependencies.
 
 ## Configuration (`.env`)
 
@@ -59,7 +59,7 @@ ollama pull qwen3:0.6b        # default model, fully configurable
 | `SEARCH_ENGINE` | `duckduckgo` | `duckduckgo` \| `disabled` |
 | `GITHUB_TOKEN` | — | optional; enables GitHub features |
 
-Settings can also be changed at runtime (Settings drawer) — persisted in SQLite, enforced only in the backend.
+Settings can also be changed at runtime (Settings drawer — including agent steps/fix rounds, team review rounds, research engine/sources) — persisted in SQLite, enforced only in the backend.
 
 ## Architecture
 
@@ -90,7 +90,8 @@ ai-command-center/
 │   └── observability/      # JSON logging · session metrics
 ├── frontend/               # React 18 · TypeScript (strict) · Vite · Tailwind v4
 └── tests/                  # pytest: API, providers, security, tools, agent,
-                            # team, compare, research, projects, git (103 tests)
+                            # team, compare, research, projects, git,
+                            # startup/hardening (115 tests)
 ```
 
 **Data flow (any model call):** resolve → **CostGuard** (blocks paid/budget-breakers pre-network) → stream from provider → exact/estimated token accounting → usage ledger (conversation/message, team member, run) → model totals → session metrics. Engines (Agent/Team/Compare/Research) never talk to a provider directly — they go through `ModelRunner`, which is the single guarded path.

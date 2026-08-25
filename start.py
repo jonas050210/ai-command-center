@@ -164,11 +164,18 @@ def ensure_frontend(allow_install: bool = True) -> bool:
         log("frontend built ✓")
         return True
 
-    # stale check: any source newer than dist/index.html → rebuild
-    newest_src = max([DIST / "index.html"] +
-                     list(FRONTEND.rglob("src/*")) +
-                     [FRONTEND / "package.json"],
-                     key=lambda p: p.stat().st_mtime if p.exists() else 0)
+    # stale check: ANY source/config newer than dist/index.html → rebuild
+    # (rglob "src/*" does not recurse, so walk the whole tree instead)
+    sources = [FRONTEND / "package.json", FRONTEND / "vite.config.ts",
+               FRONTEND / "tsconfig.json", FRONTEND / "index.html"]
+    for entry in FRONTEND.rglob("*"):
+        if not entry.is_file():
+            continue
+        if entry.is_relative_to(FRONTEND / "node_modules") or \
+                entry.is_relative_to(FRONTEND / "dist"):
+            continue
+        sources.append(entry)
+    newest_src = max(sources, key=lambda p: p.stat().st_mtime if p.exists() else 0)
     if newest_src != DIST / "index.html" and npm:
         log("frontend sources changed — rebuilding…")
         if subprocess.call([npm, "run", "build"], cwd=FRONTEND) != 0:
@@ -178,12 +185,23 @@ def ensure_frontend(allow_install: bool = True) -> bool:
 
 
 def check_ollama() -> None:
+    """Report PATH presence AND probe the actual HTTP runtime (honest)."""
+    import json as _json
+    import urllib.error as _urlerr
+    import urllib.request as _urlreq
+
     ollama = shutil.which("ollama") or shutil.which("ollama.cmd")
     if ollama is None:
-        log("Ollama not found on PATH — install it (https://ollama.com/download)")
+        log("Ollama binary not found on PATH — install it (https://ollama.com/download)")
         log(f"  Windows:  winget install Ollama.Ollama   then:  ollama pull {DEFAULT_MODEL}")
-    else:
-        log(f"Ollama found: {ollama}")
+    base = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    try:
+        with _urlreq.urlopen(f"{base}/api/version", timeout=2.0) as res:
+            data = _json.loads(res.read().decode("utf-8", errors="replace"))
+        log(f"Ollama runtime OK @ {base} (version {data.get('version', '?')})")
+    except (_urlerr.URLError, OSError, ValueError) as exc:
+        log(f"Ollama runtime NOT reachable @ {base} ({exc.__class__.__name__}) — "
+            "start `ollama serve` (or ollama app) before chatting.")
 
 
 def main() -> int:

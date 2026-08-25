@@ -54,6 +54,22 @@ PHASE 7 — GIT / GITHUB INTEGRATION ...................... DONE (v0.4.0)
     - GitHub repos/issues/PRs (real REST) with encrypted token
       storage; explicit unauthenticated state otherwise
 
+MAINTENANCE / V0.4.1 HARDENING  ...................... DONE
+    - Model Center "Test" now runs through the single guarded+metered
+      path (CostGuard before the inference; tokens in the ledger)
+    - Conversation auto-titles run through ModelRunner (guarded, metered,
+      tracked/cancelled cleanly at shutdown)
+    - Compare streams real generation deltas to the browser
+    - Message editing: user messages re-branch the turn (follow-ups
+      removed, token totals recounted); assistant messages edit in place
+    - Real `git init` from the UI; default workspace unified between
+      Agent and Git; per-project git audit entries
+    - Command allowlist tightened (npx / npm exec / npm install blocked);
+      Windows drive-absolute arguments rejected
+    - System prompt can be cleared; runtime settings include agent/team/
+      research knobs; start.py probes the Ollama HTTP endpoint and
+      rebuilds the frontend when ANY source changed
+
 PHASE 8 — EXTENSIBILITY ................................. PLANNED
     - Additional providers via the registry (cloud providers enter
       with real per-token prices → immediately subject to CostGuard)

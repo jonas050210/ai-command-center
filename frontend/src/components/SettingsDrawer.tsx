@@ -10,7 +10,8 @@ export function SettingsDrawer() {
   const { settings, settingsOpen, setSettingsOpen, saveSettings, costs } = useStore();
   const [draft, setDraft] = useState({
     free_only: true, max_spend: "0.00", default_model: "", num_ctx: "8192",
-    custom_instructions: "",
+    custom_instructions: "", agent_max_steps: 20, agent_max_fix_rounds: 2,
+    team_max_rounds: 2, search_engine: "duckduckgo", research_max_sources: 5,
   });
   const [saving, setSaving] = useState(false);
 
@@ -22,6 +23,11 @@ export function SettingsDrawer() {
         default_model: settings.default_model,
         num_ctx: String(settings.num_ctx),
         custom_instructions: settings.custom_instructions ?? "",
+        agent_max_steps: settings.agent_max_steps ?? 20,
+        agent_max_fix_rounds: settings.agent_max_fix_rounds ?? 2,
+        team_max_rounds: settings.team_max_rounds ?? 2,
+        search_engine: settings.search_engine ?? "duckduckgo",
+        research_max_sources: settings.research_max_sources ?? 5,
       });
     }
   }, [settingsOpen, settings]);
@@ -105,6 +111,48 @@ export function SettingsDrawer() {
               <div className="text-[10px] text-faint mt-1">Appended to every chat's system prompt.</div>
             </div>
           </div>
+
+          {/* agent / team / research */}
+          <div className="space-y-3">
+            <div className="micro-label">Agent / Team / Research</div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <div className="text-[11px] text-dim font-medium mb-1">Agent max steps</div>
+                <input className="input !text-[11.5px]" type="number" min="3" max="100"
+                  value={draft.agent_max_steps}
+                  onChange={(e) => setDraft((d) => ({ ...d, agent_max_steps: Number(e.target.value) || 20 }))} />
+              </div>
+              <div>
+                <div className="text-[11px] text-dim font-medium mb-1">Agent fix rounds</div>
+                <input className="input !text-[11.5px]" type="number" min="0" max="10"
+                  value={draft.agent_max_fix_rounds}
+                  onChange={(e) => setDraft((d) => ({ ...d, agent_max_fix_rounds: Number(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <div className="text-[11px] text-dim font-medium mb-1">Team review rounds</div>
+                <input className="input !text-[11.5px]" type="number" min="0" max="6"
+                  value={draft.team_max_rounds}
+                  onChange={(e) => setDraft((d) => ({ ...d, team_max_rounds: Number(e.target.value) || 0 }))} />
+              </div>
+              <div>
+                <div className="text-[11px] text-dim font-medium mb-1">Research max sources</div>
+                <input className="input !text-[11.5px]" type="number" min="1" max="8"
+                  value={draft.research_max_sources}
+                  onChange={(e) => setDraft((d) => ({ ...d, research_max_sources: Number(e.target.value) || 5 }))} />
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-dim font-medium mb-1">Research search engine</div>
+              <select className="input !text-[11.5px] cursor-pointer" value={draft.search_engine}
+                onChange={(e) => setDraft((d) => ({ ...d, search_engine: e.target.value }))}>
+                <option value="duckduckgo">DuckDuckGo (real search)</option>
+                <option value="disabled">Disabled (no network research)</option>
+              </select>
+              <div className="text-[10px] text-faint mt-1">
+                Research only ever reports real sources; when disabled it states so honestly.
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="p-4 border-t border-line flex items-center gap-2">
@@ -118,6 +166,11 @@ export function SettingsDrawer() {
                   default_model: draft.default_model.trim() || undefined,
                   num_ctx: Number(draft.num_ctx) || 8192,
                   custom_instructions: draft.custom_instructions,
+                  agent_max_steps: draft.agent_max_steps,
+                  agent_max_fix_rounds: draft.agent_max_fix_rounds,
+                  team_max_rounds: draft.team_max_rounds,
+                  search_engine: draft.search_engine,
+                  research_max_sources: draft.research_max_sources,
                 });
                 setSettingsOpen(false);
               } finally {

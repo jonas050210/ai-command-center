@@ -74,7 +74,12 @@ async def update_conversation(cid: str, body: ConversationUpdate, request: Reque
     conv = await svc.conversations_repo.get(cid)
     if conv is None:
         raise NotFound(f"Conversation '{cid}' not found.")
-    await svc.conversations_repo.update(cid, **body.model_dump(exclude_none=True))
+    patch = body.model_dump(exclude_none=True)
+    # system_prompt: null means "explicitly clear" (empty string) — the
+    # schema cannot distinguish absent from null, so use fields_set.
+    if "system_prompt" in body.model_fields_set and body.system_prompt is None:
+        patch["system_prompt"] = ""
+    await svc.conversations_repo.update(cid, **patch)
     return serialize(await svc.conversations_repo.get(cid))
 
 

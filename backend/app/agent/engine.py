@@ -161,9 +161,13 @@ class AgentEngine:
         self.executions = executions_repo
 
     def workspace_for(self, project_id: int | None) -> Path:
-        base = self.workspace_root / ("projects" if project_id is None else "projects")
+        """Per-project sandbox: <root>/projects/<default|p<id>>.
+
+        The same layout is used by GitService so Agent and Git always work
+        on the same directory for a given project.
+        """
         name = "default" if project_id is None else f"p{project_id}"
-        path = base / name
+        path = self.workspace_root / "projects" / name
         path.mkdir(parents=True, exist_ok=True)
         return path
 

@@ -33,11 +33,14 @@ log = logging.getLogger("aicc.tools.runner")
 
 # Executables an agent may invoke
 ALLOWED_COMMANDS: set[str] = {
-    "python", "python3", "pytest", "node", "npm", "npx", "tsc",
+    "python", "python3", "pytest", "node", "npm", "tsc",
     "eslint", "ruff", "mypy", "black", "flake8",
 }
-# npm subcommands we accept (no installs/publishes/network mutations)
-ALLOWED_NPM_SUBCOMMANDS = {"run", "test", "exec", "start"}
+# npm subcommands we accept. `run`/`test`/`start` execute only scripts
+# declared in the project's own package.json inside the sandbox.
+# `install`, `exec`, `npx`-style subcommands are intentionally blocked:
+# they can download and execute arbitrary code from the network.
+ALLOWED_NPM_SUBCOMMANDS = {"run", "test", "start"}
 # python invocations: allow scripts/modules, block `-c`/`-e` arbitrary code
 BLOCKED_PYTHON_FLAGS = {"-c", "-cmd", "-e", "-exec"}
 
@@ -119,6 +122,9 @@ class CommandRunner:
 
     def _validate_arg(self, arg: str) -> None:
         norm = arg.replace("\\", "/")
+        if re.match(r"^[A-Za-z]:", norm):  # Windows drive-absolute (C:\...)
+            raise BadRequest(f"Argument '{arg}' is an absolute path and was "
+                             "blocked.", code="ARG_ESCAPE_BLOCKED")
         if norm.startswith(REJECTED_ARG_PREFIXES):
             raise BadRequest(f"Argument '{arg}' resolves outside the workspace "
                              "and was blocked.", code="ARG_ESCAPE_BLOCKED")

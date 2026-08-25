@@ -27,8 +27,14 @@ from backend.app.db.repo import ModelsRepo, SettingsRepo              # noqa: E4
 # ── settings / db ────────────────────────────────────────────────────
 @pytest.fixture
 def test_settings(tmp_path) -> Settings:
-    return Settings(data_dir=tmp_path / "data", default_model=DEFAULT_MODEL_NAME,
-                    free_only=True, max_spend=0.0, ollama_host="http://testserver")
+    # Explicitly pin the workspace under tmp: pydantic-settings would
+    # otherwise load WORKSPACE_ROOT from a repo-level .env and tests would
+    # write sandbox files outside their tmp dir.
+    return Settings(data_dir=tmp_path / "data",
+                    workspace_root=tmp_path / "data" / "workspace",
+                    default_model=DEFAULT_MODEL_NAME,
+                    free_only=True, max_spend=0.0,
+                    ollama_host="http://testserver")
 
 
 @pytest.fixture
@@ -164,6 +170,7 @@ async def api(tmp_path, fake_ollama):
     """Full ASGI app with fake provider, plus client + services."""
     import httpx
     settings = Settings(data_dir=tmp_path / "data",
+                        workspace_root=tmp_path / "data" / "workspace",
                         default_model=DEFAULT_MODEL_NAME,
                         free_only=True, max_spend=0.0,
                         ollama_host="http://testserver")
@@ -177,6 +184,9 @@ async def api(tmp_path, fake_ollama):
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield Simple(client=client, app=app, svc=svc, ollama=fake_ollama,
                      settings=settings)
+    # settle/cancel tracked background work (e.g. auto-title) before the
+    # event loop and database are torn down — prevents orphaned tasks
+    await svc.requests.shutdown(timeout=5.0)
     await svc.db.close()
 
 

@@ -9,6 +9,12 @@ export interface RuntimeSettings {
   num_ctx: number;
   keep_alive: string;
   custom_instructions: string;
+  agent_max_steps: number;
+  agent_max_fix_rounds: number;
+  agent_cmd_timeout: number;
+  team_max_rounds: number;
+  search_engine: string;
+  research_max_sources: number;
   currency: string;
 }
 

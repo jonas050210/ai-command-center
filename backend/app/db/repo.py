@@ -230,6 +230,17 @@ class ConversationsRepo:
             " total_output_tokens=total_output_tokens+?, updated_at=? WHERE id=?",
             (in_tok, out_tok, utcnow(), cid))
 
+    async def recount_tokens(self, cid: str) -> None:
+        """Recompute the conversation token totals from its messages."""
+        row = await self.db.fetchone(
+            "SELECT COALESCE(SUM(input_tokens),0) AS i,"
+            " COALESCE(SUM(output_tokens),0) AS o FROM messages"
+            " WHERE conversation_id=?", (cid,))
+        await self.db.execute(
+            "UPDATE conversations SET total_input_tokens=?,"
+            " total_output_tokens=?, updated_at=? WHERE id=?",
+            (row["i"], row["o"], utcnow(), cid))
+
     async def delete(self, cid: str) -> None:
         await self.db.execute("DELETE FROM conversations WHERE id=?", (cid,))
 
@@ -263,6 +274,20 @@ class MessagesRepo:
             "UPDATE messages SET content=?, status=?, input_tokens=?, output_tokens=?,"
             " token_method=?, error=? WHERE id=?",
             (content, status, input_tokens, output_tokens, method, error, mid))
+
+    async def update_content(self, mid: str, content: str) -> None:
+        await self.db.execute("UPDATE messages SET content=? WHERE id=?",
+                              (content, mid))
+
+    async def delete_after(self, cid: str, mid: str) -> int:
+        """Delete every message that comes after *mid* (by insertion order).
+
+        Returns the number of removed messages.
+        """
+        cur = await self.db.execute(
+            "DELETE FROM messages WHERE conversation_id=? AND rowid > "
+            "(SELECT rowid FROM messages WHERE id=?)", (cid, mid))
+        return int(cur.rowcount or 0)
 
     async def delete(self, mid: str) -> None:
         await self.db.execute("DELETE FROM messages WHERE id=?", (mid,))

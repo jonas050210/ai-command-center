@@ -11,6 +11,7 @@ HTML-based, no API key) or ``disabled``.
 """
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import logging
@@ -132,7 +133,7 @@ class ResearchEngine:
                        "title": src["title"], "url": src["url"],
                        "snippet": src["snippet"][:300]}
                 try:
-                    await asyncio_sleep(0)  # yield control between fetches
+                    await asyncio.sleep(0)  # yield between fetches
                     body = await self._fetch_text(src["url"])
                     fetched.append({**src, "excerpt": body})
                 except Exception as exc:
@@ -221,8 +222,3 @@ class ResearchEngine:
         return row["result"] or self._compose_markdown(
             row["query"], json.loads(row["sources_json"] or "[]"),
             row["notes"], row["summary"], row["comparison"])
-
-
-async def asyncio_sleep(seconds: float) -> None:
-    import asyncio
-    await asyncio.sleep(seconds)
