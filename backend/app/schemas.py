@@ -69,10 +69,17 @@ class AgentRunRequest(BaseModel):
     model: str | None = None
     skills: str | None = Field(default=None, max_length=20000)
     project_id: int | None = None
+    mode: str | None = Field(default=None, max_length=20)
 
 
 class ProjectCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+    description: str = Field(default="", max_length=4000)
+
+
+class ProjectAttachRequest(BaseModel):
+    path: str = Field(min_length=1, max_length=500)
+    name: str = Field(default="", max_length=80)
     description: str = Field(default="", max_length=4000)
 
 
@@ -175,6 +182,11 @@ class ModelTestRequest(BaseModel):
 
 
 class ModelPullRequest(BaseModel):
+    name: str
+    provider: str = "ollama"
+
+
+class ModelUnloadRequest(BaseModel):
     name: str
     provider: str = "ollama"
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from ..schemas import ProjectCreateRequest, ProjectUpdateRequest
+from ..schemas import ProjectAttachRequest, ProjectCreateRequest, ProjectUpdateRequest
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -22,6 +22,14 @@ async def list_projects(request: Request, archived: bool = False) -> dict:
 async def create_project(body: ProjectCreateRequest, request: Request) -> dict:
     svc = request.app.state.services
     row = await svc.projects.create(body.name, body.description)
+    return {"project": row}
+
+
+@router.post("/attach", status_code=201)
+async def attach_folder(body: ProjectAttachRequest, request: Request) -> dict:
+    """Link an existing folder. Files stay put; archive never deletes them."""
+    svc = request.app.state.services
+    row = await svc.projects.attach(body.path, body.name, body.description)
     return {"project": row}
 
 

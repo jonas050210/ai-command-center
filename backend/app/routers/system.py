@@ -27,6 +27,11 @@ async def system_status(request: Request) -> dict:
     rt = await svc.settings_service.as_dict()
     provider = svc.providers_registry.get("ollama")
     status = await provider.status()
+    loaded = []
+    try:
+        loaded = await provider.list_loaded()
+    except Exception:
+        loaded = []
     models_count = len(await svc.models_repo.list(available_only=True))
     return {
         "ollama": {
@@ -36,6 +41,7 @@ async def system_status(request: Request) -> dict:
             "models_count": status.models_count,
             "detail": status.detail,
             "host": getattr(provider, "base_url", None),
+            "loaded": loaded,
         },
         "models_in_catalog": models_count,
         "runtime": rt,

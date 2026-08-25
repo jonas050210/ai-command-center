@@ -19,7 +19,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # App version is defined EXACTLY ONCE (here).
-APP_VERSION = "0.12.0"
+APP_VERSION = "0.15.0"
 
 
 # ── desktop / frozen app (PyInstaller onedir, P9) ────────────────────

@@ -129,5 +129,11 @@ class Provider(ABC):
         raise NotImplementedError  # optional capability
         yield  # pragma: no cover
 
+    async def list_loaded(self) -> list[dict]:
+        return []
+
+    async def unload(self, name: str) -> bool:
+        raise NotImplementedError  # optional capability
+
     async def delete_model(self, name: str) -> bool:
         raise NotImplementedError  # optional capability

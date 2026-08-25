@@ -37,8 +37,9 @@ async def _github_client(request: Request) -> GitHubClient:
 
 # ── local repo operations ────────────────────────────────────────────
 @router.get("/status")
-async def git_status(request: Request, path: str = ".") -> dict:
-    return await _git(request).status(path)
+async def git_status(request: Request, path: str = ".",
+                     project_id: int | None = None) -> dict:
+    return await _git(request).status(path, project_id=project_id)
 
 
 @router.get("/log")

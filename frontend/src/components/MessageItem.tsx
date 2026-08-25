@@ -32,7 +32,8 @@ export function MessageItem({ msg, isLast, onRegenerate }: {
       <div className="anim-fade-up flex justify-end px-6 py-1.5">
         <div className="max-w-[78%]">
           <div className="rounded-2xl rounded-br-md px-4 py-2.5 text-[13.5px] leading-relaxed
-            bg-[rgba(69,227,255,0.1)] border border-[rgba(69,227,255,0.2)] whitespace-pre-wrap break-words">
+            bg-[rgba(69,227,255,0.1)] border border-[rgba(69,227,255,0.22)]
+            shadow-[0_0_24px_rgba(69,227,255,0.05)] whitespace-pre-wrap break-words">
             {msg.content}
           </div>
           <div className="flex items-center justify-end gap-1.5 mt-1 opacity-0 hover:opacity-100 transition-opacity">

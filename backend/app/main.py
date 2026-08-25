@@ -44,6 +44,7 @@ from ..app.services.cost_guard import CostGuard
 from ..app.services.credentials_service import CredentialsService
 from ..app.services.model_router import ModelRouter
 from ..app.services.models_service import ModelsService
+from ..app.coder.service import CoderService
 from ..app.services.project_service import ProjectService
 from ..app.services.settings_service import SettingsService
 from ..app.team.service import TeamRunManager, TeamService
@@ -88,6 +89,7 @@ class Services:
     research: ResearchService
     git: GitService
     memory: MemoryService
+    coder: CoderService
 
 
 def build_services(settings: Settings) -> Services:
@@ -119,7 +121,8 @@ def build_services(settings: Settings) -> Services:
                        usage=usage_repo, models=models_repo, router=router,
                        guard=guard, settings=settings_service, requests=requests)
     models_service = ModelsService(models_repo, providers_repo, settings_service)
-    projects = ProjectService(ProjectsRepo(db), settings.resolved_workspace_root)
+    projects = ProjectService(ProjectsRepo(db), settings.resolved_workspace_root,
+                              data_dir=settings.data_dir)
     compare = CompareService(router=router, guard=guard, usage=usage_repo,
                              settings=settings_service)
 
@@ -135,7 +138,8 @@ def build_services(settings: Settings) -> Services:
         settings=settings_service, tools=tools, executor=executor,
         runs_manager=runs_manager,
         workspace_root=settings.resolved_workspace_root,
-        projects=projects, memory=memory)
+        projects=projects, memory=memory,
+        snapshots_root=settings.data_dir / "snapshots")
     team = TeamService(
         teams=TeamsRepo(db), team_runs=TeamRunsRepo(db),
         agent_runs=AgentRunsRepo(db), usage=usage_repo,
@@ -147,14 +151,18 @@ def build_services(settings: Settings) -> Services:
         settings=settings_service, run_manager=ResearchRunManager())
     git = GitService(executions=executions_repo,
                      workspace_root=settings.resolved_workspace_root,
-                     data_dir=settings.data_dir, settings=settings_service)
+                     data_dir=settings.data_dir, settings=settings_service,
+                     projects=projects)
+    coder = CoderService(projects, settings.resolved_workspace_root, models_repo,
+                         git=git)
+    agent.coder = coder
 
     return Services(
         settings=settings, db=db, vault=vault,
         credentials_service=credentials_service,
         tools=tools, executor=executor, agent=agent,
         projects=projects, compare=compare, team=team, research=research,
-        git=git, memory=memory,
+        git=git, memory=memory, coder=coder,
         settings_repo=settings_repo, providers_repo=providers_repo,
         models_repo=models_repo, conversations_repo=conversations_repo,
         messages_repo=messages_repo, usage_repo=usage_repo,
@@ -210,7 +218,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         metrics.http_requests += 1
         return await call_next(request)
 
-    from ..app.routers import (agent as agent_router, chat, compare, conversations,
+    from ..app.routers import (agent as agent_router, chat, coder as coder_router,
+                               compare, conversations,
                                costs, git, health, memory as memory_router, models,
                                projects, providers, research,
                                settings as settings_router, system, team)
@@ -230,6 +239,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(research.router, prefix="/api")
     app.include_router(git.router, prefix="/api")
     app.include_router(memory_router.router, prefix="/api")
+    app.include_router(coder_router.router, prefix="/api")
 
     # ── frontend (production build) with SPA fallback ────────────────
     dist = settings.frontend_dist

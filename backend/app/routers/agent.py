@@ -34,7 +34,7 @@ async def start_run(body: AgentRunRequest, request: Request) -> StreamingRespons
         run_id: str | None = None
         inner = svc.agent.stream_run(task=body.task, provider_name=body.provider,
                                      model_name=body.model, skills_text=body.skills,
-                                     project_id=body.project_id)
+                                     project_id=body.project_id, mode=body.mode)
         try:
             async for event in inner:
                 if run_id is None and event.get("run_id"):
@@ -81,6 +81,21 @@ async def get_run(run_id: str, request: Request) -> dict:
     steps = await svc.agent.runs.steps(run_id)
     approvals = await svc.agent.approvals.for_run(run_id)
     return {"run": run, "steps": steps, "approvals": approvals}
+
+
+@router.get("/runs/{run_id}/snapshot")
+async def get_run_snapshot(run_id: str, request: Request) -> dict:
+    svc = request.app.state.services
+    run = await svc.agent.runs.get(run_id)
+    if run is None:
+        raise NotFound(f"Agent run '{run_id}' not found.")
+    return svc.agent.snapshot_info(run_id)
+
+
+@router.post("/runs/{run_id}/undo")
+async def undo_agent_run(run_id: str, request: Request) -> dict:
+    svc = request.app.state.services
+    return await svc.agent.undo_run(run_id)
 
 
 @router.post("/approvals/{approval_id}")
