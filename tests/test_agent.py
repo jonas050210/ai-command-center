@@ -29,7 +29,7 @@ from backend.app.tools.registry import ToolContext, ToolRegistry
 
 ALL_CAPS = {Capability.FILESYSTEM_READ, Capability.FILESYSTEM_WRITE,
             Capability.COMMAND_EXECUTE, Capability.NETWORK_FETCH,
-            Capability.GIT_OPERATE}
+            Capability.GIT_OPERATE, Capability.MEMORY}
 
 
 # ── scripted provider ────────────────────────────────────────────────
@@ -328,10 +328,15 @@ class TestAgentRunApi:
         tools = (await api.client.get("/api/agent/tools")).json()["tools"]
         names = {t["name"] for t in tools}
         assert names == {"fs_edit", "fs_list", "fs_read", "fs_write", "shell_run",
-                         "web_search", "web_fetch"}
+                         "web_search", "web_fetch",
+                         "memory_search", "memory_save", "memory_forget"}
         web = {t["name"]: t for t in tools if t["name"].startswith("web_")}
         assert all(t["danger"] == "read" for t in web.values())
         assert all(t["capability"] == "network:fetch" for t in web.values())
+        mem = {t["name"]: t for t in tools if t["name"].startswith("memory_")}
+        assert mem["memory_search"]["danger"] == "read"
+        assert mem["memory_save"]["requires_approval"] is True
+        assert all(t["capability"] == "memory" for t in mem.values())
         shell = next(t for t in tools if t["name"] == "shell_run")
         assert shell["danger"] == "exec" and shell["requires_approval"] is True
 

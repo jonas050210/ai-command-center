@@ -29,6 +29,7 @@ from ..db.repo import AgentRunsRepo, ApprovalsRepo, UsageRepo
 from ..observability.metrics import metrics
 from ..providers.base import ChatMessage, ChatOptions
 from ..providers.registry import ProviderRegistry
+from ..memory.service import MemoryService
 from ..security.permissions import Capability, PermissionPolicy
 from ..services.context import compact_messages, effective_num_ctx, summarize_middle
 from ..services.cost_guard import CostGuard
@@ -51,6 +52,7 @@ _CAPABILITY_SETTINGS = {
     Capability.COMMAND_EXECUTE: "cap_command_execute",
     Capability.NETWORK_FETCH: "cap_network_fetch",
     Capability.GIT_OPERATE: "cap_git_operate",
+    Capability.MEMORY: "cap_memory",
 }
 
 
@@ -83,7 +85,8 @@ class AgentEngine:
                  settings: SettingsService, tools: ToolRegistry,
                  executor: ToolExecutor, runs_manager: RunManager,
                  workspace_root: Path,
-                 projects: ProjectService | None = None):
+                 projects: ProjectService | None = None,
+                 memory: MemoryService | None = None):
         self.runs = runs
         self.approvals = approvals
         self.usage = usage
@@ -96,6 +99,7 @@ class AgentEngine:
         self.runs_manager = runs_manager
         self.workspace_root = workspace_root
         self.projects = projects
+        self.memory = memory
         self._pending_approvals: dict[str, asyncio.Future[bool]] = {}
 
     # ── policy ───────────────────────────────────────────────────────
@@ -229,9 +233,20 @@ class AgentEngine:
                                        "or llama3.1:8b are recommended for agents."})
             tool_schemas = self.tools.schemas(tools_wanted)
             effective_root = project_root or self.workspace_root
+            # P8: standing instructions (AGENT.md) + persistent memory join
+            # the per-request skills — everything labeled in the prompt.
+            agent_md = None
+            memory_block = None
+            if self.memory is not None:
+                agent_md = await self.memory.build_skills_text(
+                    self.workspace_root, project_root)
+                memory_block = await self.memory.memory_text()
+            combined_skills = "\n\n".join(
+                p for p in (agent_md, skills_text) if p) or None
             system_prompt = build_agent_system_prompt(
                 workspace_root=str(effective_root),
-                tools=self.tools.describe_all(), skills_text=skills_text,
+                tools=self.tools.describe_all(), skills_text=combined_skills,
+                memory_text=memory_block,
                 custom_instructions=custom_instructions or None,
                 project_name=project_row["name"] if project_row else None)
             await self.runs.add_step(run_id, 0, "note", "run started",
@@ -242,7 +257,8 @@ class AgentEngine:
                 ChatMessage(role="user", content=task),
             ]
             ctx = ToolContext(workspace_root=self.workspace_root,
-                              project_root=project_root, run_id=run_id)
+                              project_root=project_root, run_id=run_id,
+                              memory=self.memory)
             consecutive_errors = 0
 
             hit_max_steps = False

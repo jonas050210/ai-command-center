@@ -21,8 +21,8 @@ from ..app.db.database import Database
 from ..app.db.migrations import migrate
 from ..app.db.repo import (AgentRunsRepo, ApprovalsRepo, ConversationsRepo,
                            CredentialsRepo, ExecutionsRepo, MessagesRepo,
-                           ModelsRepo, ProjectsRepo, ProvidersRepo,
-                           ResearchRepo, SettingsRepo,
+                           MemoriesRepo, ModelsRepo, ProjectsRepo,
+                           ProvidersRepo, ResearchRepo, SettingsRepo,
                            TeamRunsRepo, TeamsRepo, UsageRepo)
 from ..app.observability.logging import setup_logging
 from ..app.observability.metrics import metrics
@@ -37,6 +37,7 @@ from ..app.security.guards import (ApiTokenManager, ApiTokenMiddleware,
                                    SecurityHeadersMiddleware)
 from ..app.security.ratelimit import RateLimitMiddleware
 from ..app.gitops.service import GitService
+from ..app.memory.service import MemoryService
 from ..app.services.chat_service import ChatService, RequestManager
 from ..app.services.compare_service import CompareService
 from ..app.services.cost_guard import CostGuard
@@ -86,6 +87,7 @@ class Services:
     team: TeamService
     research: ResearchService
     git: GitService
+    memory: MemoryService
 
 
 def build_services(settings: Settings) -> Services:
@@ -126,13 +128,14 @@ def build_services(settings: Settings) -> Services:
     register_builtin_tools(tools)
     executor = ToolExecutor(tools, executions_repo)
     runs_manager = RunManager()
+    memory = MemoryService(MemoriesRepo(db))
     agent = AgentEngine(
         runs=AgentRunsRepo(db), approvals=ApprovalsRepo(db), usage=usage_repo,
         registry=registry, router=router, guard=guard,
         settings=settings_service, tools=tools, executor=executor,
         runs_manager=runs_manager,
         workspace_root=settings.resolved_workspace_root,
-        projects=projects)
+        projects=projects, memory=memory)
     team = TeamService(
         teams=TeamsRepo(db), team_runs=TeamRunsRepo(db),
         agent_runs=AgentRunsRepo(db), usage=usage_repo,
@@ -151,7 +154,7 @@ def build_services(settings: Settings) -> Services:
         credentials_service=credentials_service,
         tools=tools, executor=executor, agent=agent,
         projects=projects, compare=compare, team=team, research=research,
-        git=git,
+        git=git, memory=memory,
         settings_repo=settings_repo, providers_repo=providers_repo,
         models_repo=models_repo, conversations_repo=conversations_repo,
         messages_repo=messages_repo, usage_repo=usage_repo,
@@ -208,8 +211,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await call_next(request)
 
     from ..app.routers import (agent as agent_router, chat, compare, conversations,
-                               costs, git, health, models, projects, providers,
-                               research, settings as settings_router, system, team)
+                               costs, git, health, memory as memory_router, models,
+                               projects, providers, research,
+                               settings as settings_router, system, team)
 
     app.include_router(health.router, prefix="/api")
     app.include_router(system.router, prefix="/api")
@@ -225,6 +229,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(team.router, prefix="/api")
     app.include_router(research.router, prefix="/api")
     app.include_router(git.router, prefix="/api")
+    app.include_router(memory_router.router, prefix="/api")
 
     # ── frontend (production build) with SPA fallback ────────────────
     dist = settings.frontend_dist

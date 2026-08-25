@@ -3,10 +3,113 @@
 // backend-side. Provider API keys are write-only: saved through the
 // encrypted vault, only masked hints are ever shown.
 import { useEffect, useState } from "react";
+import { getJSON, sendJSON } from "../api";
 import { useStore } from "../store";
-import type { ProviderInfo } from "../types";
+import type { MemoryRow, ProviderInfo } from "../types";
 import { formatEuro } from "../utils";
 import { CheckIcon, ShieldIcon, XIcon } from "../icons";
+
+function MemorySection() {
+  const { notify } = useStore();
+  const [memories, setMemories] = useState<MemoryRow[]>([]);
+  const [newKey, setNewKey] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [agentMd, setAgentMd] = useState("");
+  const [agentMdPresent, setAgentMdPresent] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const reload = async () => {
+    try {
+      const m = await getJSON<{ memories: MemoryRow[] }>("/api/memory");
+      setMemories(m.memories);
+      const f = await getJSON<{ content: string; present: boolean }>(
+        "/api/memory/file");
+      setAgentMd(f.content);
+      setAgentMdPresent(f.present);
+    } catch { /* network hiccup — keep stale */ }
+  };
+
+  useEffect(() => { void reload(); }, []);
+
+  return (
+    <div className="glass-soft rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-[13px] font-bold">Memory & skills</span>
+        <span className="chip !text-[9px] ml-auto">{memories.length} memories</span>
+      </div>
+      <div className="text-[10.5px] text-faint leading-snug">
+        Injected into every agent run, honestly labeled in the prompt. The agent
+        can also save/forget memories itself — each save asks for your approval.
+      </div>
+
+      {memories.map((m) => (
+        <div key={m.id} className="flex items-start gap-2 text-[11px]">
+          <div className="flex-1 min-w-0">
+            <span className="font-semibold text-dim">{m.key}</span>
+            <span className="text-faint"> — {m.content}</span>
+            {m.source.startsWith("agent:") &&
+              <span className="chip chip-accent !text-[8px] !px-1 !py-0 ml-1.5">agent</span>}
+          </div>
+          <button className="text-faint hover:text-bad transition-colors shrink-0"
+            title="Delete memory"
+            onClick={() => void sendJSON("DELETE", `/api/memory/${m.id}`)
+              .then(reload)}>
+            <XIcon className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ))}
+      {memories.length === 0 &&
+        <div className="text-[10.5px] text-faint">No memories yet.</div>}
+
+      <div className="flex gap-1.5">
+        <input className="input !w-[130px] !py-1 !px-2 !text-[10.5px]"
+          placeholder="key" value={newKey}
+          onChange={(e) => setNewKey(e.target.value)} />
+        <input className="input flex-1 !py-1 !px-2 !text-[10.5px]"
+          placeholder="fact to remember" value={newContent}
+          onChange={(e) => setNewContent(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") document.getElementById("mem-add")?.click(); }} />
+        <button id="mem-add" className="btn btn-ghost !text-[10px] !py-1"
+          disabled={busy || !newKey.trim() || !newContent.trim()}
+          onClick={() => {
+            setBusy(true);
+            void sendJSON("POST", "/api/memory",
+              { key: newKey.trim(), content: newContent.trim() })
+              .then(() => { setNewKey(""); setNewContent(""); return reload(); })
+              .catch(() => notify("Invalid memory (key chars/length)", "bad"))
+              .finally(() => setBusy(false));
+          }}>
+          Add
+        </button>
+      </div>
+
+      <div className="border-t border-line pt-2.5 space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold">AGENT.md</span>
+          {agentMdPresent && <span className="chip chip-good !text-[8.5px]">active</span>}
+          <span className="text-[9px] text-faint ml-auto">workspace root · standing instructions</span>
+        </div>
+        <textarea className="input w-full resize-none !text-[10.5px] font-mono !py-1.5"
+          rows={4} placeholder={"e.g. Always run pytest after changes.\nPrefer small commits."}
+          value={agentMd} onChange={(e) => setAgentMd(e.target.value)} />
+        <div className="flex gap-1.5 justify-end">
+          {agentMdPresent && (
+            <button className="btn btn-ghost !text-[10px] !py-1 !text-bad"
+              onClick={() => void sendJSON("PUT", "/api/memory/file", { content: "" })
+                .then(reload)}>
+              Remove
+            </button>)}
+          <button className="btn btn-ghost !text-[10px] !py-1" disabled={busy}
+            onClick={() => void sendJSON("PUT", "/api/memory/file",
+              { content: agentMd }).then(reload)
+              .then(() => notify("AGENT.md saved", "good"))}>
+            Save AGENT.md
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ProviderRow({ provider }: { provider: ProviderInfo }) {
   const { saveProviderKey, removeProviderKey } = useStore();
@@ -91,7 +194,7 @@ export function SettingsDrawer() {
     free_only: true, max_spend: "0.00", default_model: "", default_provider: "ollama",
     num_ctx: "8192", custom_instructions: "", eur_per_usd: "0.92",
     cap_filesystem_read: true, cap_filesystem_write: true, cap_command_execute: true,
-    cap_network_fetch: true, cap_git_operate: false,
+    cap_network_fetch: true, cap_git_operate: false, cap_memory: true,
   });
   const [saving, setSaving] = useState(false);
 
@@ -110,13 +213,15 @@ export function SettingsDrawer() {
         cap_command_execute: settings.cap_command_execute ?? true,
         cap_network_fetch: settings.cap_network_fetch ?? true,
         cap_git_operate: settings.cap_git_operate ?? false,
+        cap_memory: settings.cap_memory ?? true,
       });
       void refreshProviders();
     }
   }, [settingsOpen, settings, refreshProviders]);
 
   const capToggle = (key: "cap_filesystem_read" | "cap_filesystem_write"
-    | "cap_command_execute" | "cap_network_fetch" | "cap_git_operate",
+    | "cap_command_execute" | "cap_network_fetch" | "cap_git_operate"
+    | "cap_memory",
     title: string, hint: string, dangerous = false) => (
     <label className="flex items-center justify-between gap-3 cursor-pointer">
       <div>
@@ -213,7 +318,11 @@ export function SettingsDrawer() {
               "web_search / web_fetch + Research Mode. SSRF-guarded, read-only.")}
             {capToggle("cap_git_operate", "Git operations",
               "git init/branch/commit/push in the workspace sandbox — audited, opt-in.")}
+            {capToggle("cap_memory", "Memory",
+              "memory_search is read-only; memory_save/forget are approval-gated.", true)}
           </div>
+
+          <MemorySection />
 
           {/* model defaults */}
           <div className="space-y-3">
@@ -287,6 +396,7 @@ export function SettingsDrawer() {
                   cap_command_execute: draft.cap_command_execute,
                   cap_network_fetch: draft.cap_network_fetch,
                   cap_git_operate: draft.cap_git_operate,
+                  cap_memory: draft.cap_memory,
                 });
                 setSettingsOpen(false);
               } finally {

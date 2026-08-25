@@ -27,6 +27,7 @@ _TYPES: dict[str, type] = {
     "cap_command_execute": bool,
     "cap_network_fetch": bool,
     "cap_git_operate": bool,
+    "cap_memory": bool,
 }
 
 
@@ -44,13 +45,14 @@ class SettingsService:
             "custom_instructions": "",
             "eur_per_usd": str(env.eur_per_usd),
             # local-first agent defaults: read/write/exec granted (every
-            # mutating action still requires human approval), network and
-            # git stay OFF until their phases ship.
+            # mutating action still requires human approval); network fetch
+            # (Research Mode P6) and memory (P8) ship on; git stays opt-in.
             "cap_filesystem_read": "true",
             "cap_filesystem_write": "true",
             "cap_command_execute": "true",
-            "cap_network_fetch": "true",     # Research Mode + web tools are live (P6)
+            "cap_network_fetch": "true",
             "cap_git_operate": "false",
+            "cap_memory": "true",
         }
 
     async def get(self, key: str) -> str:

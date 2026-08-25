@@ -561,6 +561,45 @@ class ApprovalsRepo:
             "SELECT * FROM approvals WHERE run_id=? ORDER BY created_at", (rid,))
 
 
+# ─────────────────────────────── memory ──────────────────────────────
+class MemoriesRepo:
+    """Long-term memory rows — written by the user (Settings) or by agent
+    runs through the memory tools (gateway-approved, audited)."""
+    def __init__(self, db: Database):
+        self.db = db
+
+    async def upsert(self, key: str, content: str, source: str = "user") -> None:
+        await self.db.execute(
+            "INSERT INTO memories (key, content, source, created_at, updated_at)"
+            " VALUES (?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET"
+            " content=excluded.content, source=excluded.source,"
+            " updated_at=excluded.updated_at",
+            (key, content, source, utcnow(), utcnow()))
+
+    async def delete(self, mem_id: int) -> bool:
+        cur = await self.db.execute("DELETE FROM memories WHERE id=?", (mem_id,))
+        return (cur.rowcount or 0) > 0
+
+    async def delete_by_key(self, key: str) -> bool:
+        cur = await self.db.execute("DELETE FROM memories WHERE key=?", (key,))
+        return (cur.rowcount or 0) > 0
+
+    async def list(self, limit: int = 100) -> list[dict]:
+        return await self.db.fetchall(
+            "SELECT * FROM memories ORDER BY updated_at DESC, id DESC LIMIT ?",
+            (limit,))
+
+    async def search(self, query: str, limit: int = 10) -> list[dict]:
+        like = f"%{query}%"
+        return await self.db.fetchall(
+            "SELECT * FROM memories WHERE key LIKE ? OR content LIKE ?"
+            " ORDER BY updated_at DESC LIMIT ?", (like, like, limit))
+
+    async def count(self) -> int:
+        row = await self.db.fetchone("SELECT COUNT(*) AS n FROM memories")
+        return int(row["n"]) if row else 0
+
+
 # ───────────────────────────── research mode ─────────────────────────
 class ResearchRepo:
     def __init__(self, db: Database):

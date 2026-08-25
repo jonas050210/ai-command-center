@@ -45,6 +45,7 @@ class ToolContext:
     project_root: Any | None = None  # Path | None (P4 projects)
     run_id: str | None = None
     actor: str = "agent"
+    memory: Any | None = None        # MemoryService | None (P8)
 
     @property
     def root(self):

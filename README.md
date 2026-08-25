@@ -6,7 +6,7 @@ Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Pytho
 
 ---
 
-## What works today (Phases 0–7, fully implemented, tests passing)
+## What works today (Phases 0–8, fully implemented, tests passing)
 
 | Area | Capabilities |
 |---|---|
@@ -20,6 +20,7 @@ Built for: Windows 11 · Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Pytho
 | **Research Mode** | Web-grounded answers with numbered citations: DuckDuckGo search → **SSRF-guarded** fetch (private/loopback/link-local blocked, redirect chain re-validated, hard size caps, page text honestly marked truncated) → answer pass with `[n]` citations. Sources that fail are dropped *and said so*; if nothing could be read, the run fails instead of hallucinating. Runs persist to history. The same web layer powers the agent's `web_search`/`web_fetch` tools (READ-tier, `network:fetch` capability) |
 | **Token tracking** | Input / output / total — always labeled **exact** or **estimated**. Per message, conversation, model card and session |
 | **€0 CostGuard** | `FREE_ONLY=true`, `MAX_SPEND=0.00` by default. Paid requests are **blocked server-side before any network call**: *"Paid model blocked. Free-only mode is enabled. No money was spent."* Tested against request-body bypass attempts |
+| **Memory & Skills** | Persistent memory (survives runs, labeled in the prompt): user CRUD in Settings, agent `memory_search/save/forget` tools gated by the `memory` capability (saves are approval-gated + audited, source provenance kept). `AGENT.md` standing instructions chain workspace→project into every run's prompt, inspectable via `/api/memory/context` |
 | **Git / GitHub** | Local git inside the workspace sandbox: status (staged/untracked/modified), diff (capped, honest truncation), log, branches (create+switch, validated names), commit (repo identity or honest fallback), push (+set-upstream; HTTPS via GIT_ASKPASS with the token **never in argv/logs** and **only ever to github.com**), remote add (github https/ssh + local). GitHub REST: user, repos, create-private-repo — PAT vault-encrypted, masked everywhere. Mutations need the `git:operate` capability (off by default) and every operation is audited. Destructive ops (reset --hard, force-push, clean) are deliberately not offered |
 | **Security** | Fernet-encrypted credentials, workspace path-containment sandbox (blocks `../`, `..\\`, UNC), deny-by-default capability policy (`filesystem:read/write`, `command:execute`, `network:fetch` on by default · `git:operate` opt-in), tool execution audit log, security headers, host/origin guard, API-token middleware, rate limiting, JSON logs with rotation + secret redaction |
 
@@ -88,7 +89,7 @@ ai-command-center/
 ├── frontend/               # React 18 · TypeScript (strict) · Vite · Tailwind v4
 │   └── src/                # store · api (REST + SSE) · views (chat/agent/compare/team/
 │                           # research/projects/models) · shared agent UI components
-└── tests/                  # 217 pytest tests (unit + API + SSE flows, all faked nets)
+└── tests/                  # 228 pytest tests (unit + API + SSE flows, all faked nets)
 ```
 
 **Data flow (any LLM call):** request → ModelRouter (explicit provider › synced catalog › default provider; *no cross-provider fallback*) → **CostGuard** (blocks paid/budget-breakers pre-network) → provider stream → exact token accounting → usage ledger → session metrics.
@@ -97,11 +98,11 @@ ai-command-center/
 
 ## Database (SQLite, migration-managed)
 
-`conversations · messages · models · providers · settings · credentials · usage_events · executions · projects · research · teams · team_members · agent_runs · agent_steps · approvals · team_runs · schema_migrations`
+`conversations · messages · models · providers · settings · credentials · usage_events · executions · projects · research · teams · team_members · agent_runs · agent_steps · approvals · team_runs · memories · schema_migrations` (V1–V5 migrations)
 
 ## API summary
 
-`GET /api/health` · `GET /api/system/status` · `GET|PUT /api/settings` · `GET /api/costs` · `GET /api/usage/tokens` · `GET /api/providers` (+key endpoints) · `GET /api/models` (+filters) · `POST /api/models/refresh|test|pull(SSE)` · favorites/delete · `GET|POST|PATCH|DELETE /api/conversations[/{id}]` · `POST /api/chat/completions|regenerate|stop (SSE)` · `POST /api/agent/runs (SSE)` + stop/history/approvals/capabilities/tools/executions · `GET|POST /api/projects` (+archive) · `POST /api/compare/runs (SSE)` · `GET|POST /api/team` + runs (SSE)/stop · `POST /api/research/query (SSE)` + history/detail/stop · `GET /api/git/status|log|diff|branches` · `POST /api/git/init|branches|commit|push|remote` · `/api/git/github/token|user|repos`. Interactive docs at `/api/docs`.
+`GET /api/health` · `GET /api/system/status` · `GET|PUT /api/settings` · `GET /api/costs` · `GET /api/usage/tokens` · `GET /api/providers` (+key endpoints) · `GET /api/models` (+filters) · `POST /api/models/refresh|test|pull(SSE)` · favorites/delete · `GET|POST|PATCH|DELETE /api/conversations[/{id}]` · `POST /api/chat/completions|regenerate|stop (SSE)` · `POST /api/agent/runs (SSE)` + stop/history/approvals/capabilities/tools/executions · `GET|POST /api/projects` (+archive) · `POST /api/compare/runs (SSE)` · `GET|POST /api/team` + runs (SSE)/stop · `POST /api/research/query (SSE)` + history/detail/stop · `GET /api/git/status|log|diff|branches` · `POST /api/git/init|branches|commit|push|remote` · `/api/git/github/token|user|repos` · `GET|POST|DELETE /api/memory` · `GET|PUT /api/memory/file` · `GET /api/memory/context`. Interactive docs at `/api/docs`.
 
 ## Hardware notes (RTX 4060 Ti 8GB)
 

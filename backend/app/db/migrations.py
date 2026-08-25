@@ -271,11 +271,23 @@ CREATE TABLE IF NOT EXISTS team_runs (
 CREATE INDEX IF NOT EXISTS idx_team_runs_team ON team_runs(team_id);
 """
 
+SCHEMA_V5 = """
+CREATE TABLE IF NOT EXISTS memories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    content TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'user',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "initial_schema", SCHEMA_V1),
     (2, "agent_mode", SCHEMA_V2),
     (3, "agent_run_projects", SCHEMA_V3),
     (4, "team_runs", SCHEMA_V4),
+    (5, "memories", SCHEMA_V5),
 ]
 
 

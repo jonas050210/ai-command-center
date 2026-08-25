@@ -18,6 +18,17 @@ export interface RuntimeSettings {
   cap_command_execute: boolean;
   cap_network_fetch: boolean;
   cap_git_operate: boolean;
+  cap_memory: boolean;
+}
+
+// ── Memory & skills ──────────────────────────────────────────────────
+export interface MemoryRow {
+  id: number;
+  key: string;
+  content: string;
+  source: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface OllamaStatus {

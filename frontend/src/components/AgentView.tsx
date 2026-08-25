@@ -43,6 +43,7 @@ export function AgentView() {
   const [streamError, setStreamError] = useState<{ code: string; message: string } | null>(null);
   const [deciding, setDeciding] = useState(false);
   const [caps, setCaps] = useState<Record<string, boolean> | null>(null);
+  const [memCtx, setMemCtx] = useState<{ memory_count: number; agent_md: boolean } | null>(null);
   const [toolInfos, setToolInfos] = useState<AgentToolInfo[]>([]);
   const [runs, setRuns] = useState<AgentRunRow[]>([]);
   const [detail, setDetail] = useState<{ run: AgentRunRow; steps: AgentStepRow[]; approvals: AgentApprovalRow[] } | null>(null);
@@ -67,6 +68,8 @@ export function AgentView() {
   useEffect(() => {
     getJSON<{ capabilities: Record<string, boolean> }>("/api/agent/capabilities")
       .then((d) => setCaps(d.capabilities)).catch(() => undefined);
+    getJSON<{ memory_count: number; agent_md: boolean }>("/api/memory/context")
+      .then(setMemCtx).catch(() => undefined);
     getJSON<{ tools: AgentToolInfo[] }>("/api/agent/tools")
       .then((d) => setToolInfos(d.tools)).catch(() => undefined);
     getJSON<{ projects: ProjectRow[] }>("/api/projects")
@@ -256,13 +259,19 @@ export function AgentView() {
           {caps && Object.entries({
             "read files": caps["filesystem:read"], "write files": caps["filesystem:write"],
             "run commands": caps["command:execute"], "network": caps["network:fetch"],
-            "git": caps["git:operate"],
+            "git": caps["git:operate"], "memory": caps["memory"],
           }).map(([label, on]) => (
             <span key={label} className={cx("chip !text-[9px] !py-[1px]",
               on ? "chip-good" : "opacity-50")}>
               {on ? "✓" : "✕"} {label}
             </span>
           ))}
+          {memCtx && (memCtx.memory_count > 0 || memCtx.agent_md) && (
+            <span className="chip chip-accent !text-[9px] !py-[1px]"
+              title="Injected into the next run's prompt (Settings → Memory & skills)">
+              context: {memCtx.memory_count} memories{memCtx.agent_md ? " + AGENT.md" : ""}
+            </span>
+          )}
           <span className="text-faint ml-1">— toggled in Settings → Agent permissions</span>
           {!modelHasTools && effectiveModel && (
             <span className="chip chip-warn !text-[9px] !py-[1px] ml-auto">

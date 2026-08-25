@@ -4,6 +4,7 @@ from __future__ import annotations
 
 def build_agent_system_prompt(*, workspace_root: str,
                               tools: list[dict], skills_text: str | None = None,
+                              memory_text: str | None = None,
                               custom_instructions: str | None = None,
                               project_name: str | None = None) -> str:
     tool_lines = "\n".join(
@@ -40,6 +41,11 @@ RULES
 """
     if skills_text:
         prompt += f"\nACTIVE SKILL INSTRUCTIONS\n{skills_text.strip()}\n"
+    if memory_text:
+        prompt += ("\nPERSISTENT MEMORY (facts saved by you or the user — trust,"
+                   " but verify when unsure)\n" + memory_text.strip()
+                   + "\nSave new durable facts with memory_save; remove stale"
+                     " ones with memory_forget.\n")
     if custom_instructions:
         prompt += f"\nUSER CUSTOM INSTRUCTIONS\n{custom_instructions.strip()}\n"
     return prompt

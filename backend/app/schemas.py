@@ -60,6 +60,7 @@ class SettingsUpdateExt(SettingsUpdate):
     cap_command_execute: bool | None = None
     cap_network_fetch: bool | None = None
     cap_git_operate: bool | None = None
+    cap_memory: bool | None = None
 
 
 class AgentRunRequest(BaseModel):
@@ -149,6 +150,15 @@ class GithubRepoCreateRequest(BaseModel):
                       pattern="^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
     private: bool = True
     description: str = Field(default="", max_length=350)
+
+
+class MemorySaveRequest(BaseModel):
+    key: str = Field(min_length=1, max_length=60)
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class AgentMdRequest(BaseModel):
+    content: str = Field(default="", max_length=20000)
 
 
 class AgentStopRequest(BaseModel):

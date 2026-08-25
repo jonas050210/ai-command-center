@@ -191,6 +191,51 @@ async def web_fetch_tool(args: dict, ctx: ToolContext) -> ToolResult:
     return ToolResult(ok=True, output=header + text + note, ms=round(ms, 1))
 
 
+# ── memory tools (P8) ───────────────────────────────────────────────
+async def memory_search_tool(args: dict, ctx: ToolContext) -> ToolResult:
+    if ctx.memory is None:
+        return ToolResult(ok=False, output="",
+                          error="memory is not configured for this run")
+    t0 = time.monotonic()
+    rows = await ctx.memory.search(str(args.get("query") or ""), limit=10)
+    ms = (time.monotonic() - t0) * 1000
+    if not rows:
+        return ToolResult(ok=True, output="No memories found.",
+                          ms=round(ms, 1))
+    return ToolResult(ok=True, ms=round(ms, 1),
+                      output="\n".join(f"- {r['key']}: {r['content']}"
+                                       for r in rows))
+
+
+async def memory_save_tool(args: dict, ctx: ToolContext) -> ToolResult:
+    if ctx.memory is None:
+        return ToolResult(ok=False, output="",
+                          error="memory is not configured for this run")
+    t0 = time.monotonic()
+    try:
+        saved = await ctx.memory.save(args["key"], args["content"],
+                                      source=f"agent:{ctx.run_id or 'run'}")
+    except ValueError as exc:
+        return ToolResult(ok=False, output="", error=str(exc))
+    ms = (time.monotonic() - t0) * 1000
+    return ToolResult(ok=True, output=f"memory saved: {saved['key']}",
+                      ms=round(ms, 1))
+
+
+async def memory_forget_tool(args: dict, ctx: ToolContext) -> ToolResult:
+    if ctx.memory is None:
+        return ToolResult(ok=False, output="",
+                          error="memory is not configured for this run")
+    t0 = time.monotonic()
+    removed = await ctx.memory.forget(str(args["key"]))
+    ms = (time.monotonic() - t0) * 1000
+    if not removed:
+        return ToolResult(ok=False, output="",
+                          error=f"no memory with key '{args['key']}'")
+    return ToolResult(ok=True, output=f"memory removed: {args['key']}",
+                      ms=round(ms, 1))
+
+
 # ── shell tool ───────────────────────────────────────────────────────
 def split_command(command: str) -> list[str]:
     return shlex.split(command, posix=(os.name != "nt"))
@@ -358,3 +403,35 @@ def register_builtin_tools(registry: ToolRegistry) -> None:
                     "required": ["url"]},
         danger=ToolDanger.READ, capability=Capability.NETWORK_FETCH,
         handler=web_fetch_tool))
+    registry.register(ToolSpec(
+        name="memory_search",
+        description=("Search long-term memory (persistent facts from earlier "
+                     "runs and the user). Empty query lists the most recent."),
+        parameters={"type": "object",
+                    "properties": {"query": {"type": "string",
+                                             "description": "Search text (optional)"}},
+                    "required": []},
+        danger=ToolDanger.READ, capability=Capability.MEMORY,
+        handler=memory_search_tool))
+    registry.register(ToolSpec(
+        name="memory_save",
+        description=("Save a durable fact to long-term memory for future runs "
+                     "(short key + concise content). Requires human approval."),
+        parameters={"type": "object",
+                    "properties": {
+                        "key": {"type": "string",
+                                "description": "Short unique label, e.g. 'project stack'"},
+                        "content": {"type": "string",
+                                    "description": "The fact to remember (concise)"}},
+                    "required": ["key", "content"]},
+        danger=ToolDanger.WRITE, capability=Capability.MEMORY,
+        handler=memory_save_tool))
+    registry.register(ToolSpec(
+        name="memory_forget",
+        description=("Remove a stale memory by key. Requires human approval."),
+        parameters={"type": "object",
+                    "properties": {"key": {"type": "string",
+                                           "description": "Memory key to remove"}},
+                    "required": ["key"]},
+        danger=ToolDanger.WRITE, capability=Capability.MEMORY,
+        handler=memory_forget_tool))
