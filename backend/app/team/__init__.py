@@ -1,15 +1,5 @@
-"""Team Mode (Multi-Model AI Team) — flagship future feature.
+"""Team Mode (P5) — multi-model pipeline (planner → executor → reviewer).
 
-Status: NOT IMPLEMENTED. Database foundations (teams, team_members,
-tasks, per-member token columns) are already in place so the
-orchestrator can integrate cleanly later. The boundary is exposed at
-``/api/team`` and returns HTTP 501 — never a fake demo.
+Implemented in ``service.py`` on top of the agent engine; the HTTP surface
+lives in ``routers/team.py`` (the legacy 501 boundary is gone).
 """
-from ..core.errors import FeatureNotImplemented
-
-
-def unavailable() -> None:
-    raise FeatureNotImplemented(
-        "Team Mode is NOT IMPLEMENTED in this phase. "
-        "2–4 models planning, dividing and reviewing work arrives in Phase 5 — "
-        "see ROADMAP.")

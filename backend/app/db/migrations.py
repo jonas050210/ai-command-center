@@ -200,8 +200,82 @@ CREATE TABLE IF NOT EXISTS credentials (
 );
 """
 
+SCHEMA_V2 = """
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id TEXT PRIMARY KEY,
+    task TEXT NOT NULL,
+    provider TEXT,
+    model TEXT,
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK(status IN ('running','complete','error','stopped','denied')),
+    result TEXT NOT NULL DEFAULT '',
+    error TEXT,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    steps INTEGER NOT NULL DEFAULT 0,
+    skills TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS agent_steps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    step INTEGER NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('model','tool_call','tool_result','approval','note')),
+    content TEXT NOT NULL DEFAULT '',
+    data_json TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_steps_run ON agent_steps(run_id, id);
+
+CREATE TABLE IF NOT EXISTS approvals (
+    id TEXT PRIMARY KEY,
+    run_id TEXT REFERENCES agent_runs(id) ON DELETE CASCADE,
+    tool TEXT NOT NULL,
+    args_json TEXT NOT NULL DEFAULT '{}',
+    preview TEXT,
+    danger TEXT NOT NULL DEFAULT 'write',
+    status TEXT NOT NULL DEFAULT 'pending'
+        CHECK(status IN ('pending','approved','denied','expired')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    decided_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_approvals_run ON approvals(run_id);
+"""
+
+SCHEMA_V3 = """
+ALTER TABLE agent_runs ADD COLUMN project_id INTEGER REFERENCES projects(id)
+    ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_agent_runs_project ON agent_runs(project_id);
+"""
+
+SCHEMA_V4 = """
+CREATE TABLE IF NOT EXISTS team_runs (
+    id TEXT PRIMARY KEY,
+    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    task TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'running'
+        CHECK(status IN ('running','complete','error','stopped','denied')),
+    plan_text TEXT NOT NULL DEFAULT '',
+    result_text TEXT NOT NULL DEFAULT '',
+    review_text TEXT NOT NULL DEFAULT '',
+    verdict TEXT CHECK(verdict IN ('accepted','changes_requested') OR verdict IS NULL),
+    revision_used INTEGER NOT NULL DEFAULT 0,
+    executor_run_id TEXT REFERENCES agent_runs(id) ON DELETE SET NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_team_runs_team ON team_runs(team_id);
+"""
+
 MIGRATIONS: list[tuple[int, str, str]] = [
     (1, "initial_schema", SCHEMA_V1),
+    (2, "agent_mode", SCHEMA_V2),
+    (3, "agent_run_projects", SCHEMA_V3),
+    (4, "team_runs", SCHEMA_V4),
 ]
 
 

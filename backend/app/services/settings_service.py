@@ -16,9 +16,17 @@ _TYPES: dict[str, type] = {
     "free_only": bool,
     "max_spend": float,
     "default_model": str,
+    "default_provider": str,
     "num_ctx": int,
     "keep_alive": str,
     "custom_instructions": str,
+    "eur_per_usd": float,
+    # agent capability grants (permission policy source of truth)
+    "cap_filesystem_read": bool,
+    "cap_filesystem_write": bool,
+    "cap_command_execute": bool,
+    "cap_network_fetch": bool,
+    "cap_git_operate": bool,
 }
 
 
@@ -30,9 +38,19 @@ class SettingsService:
             "free_only": "true" if env.free_only else "false",
             "max_spend": str(env.max_spend),
             "default_model": env.default_model,
+            "default_provider": env.default_provider,
             "num_ctx": str(env.ollama_num_ctx),
             "keep_alive": env.ollama_keep_alive,
             "custom_instructions": "",
+            "eur_per_usd": str(env.eur_per_usd),
+            # local-first agent defaults: read/write/exec granted (every
+            # mutating action still requires human approval), network and
+            # git stay OFF until their phases ship.
+            "cap_filesystem_read": "true",
+            "cap_filesystem_write": "true",
+            "cap_command_execute": "true",
+            "cap_network_fetch": "true",     # Research Mode + web tools are live (P6)
+            "cap_git_operate": "false",
         }
 
     async def get(self, key: str) -> str:

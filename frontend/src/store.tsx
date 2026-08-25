@@ -6,8 +6,8 @@ import {
 import type { ReactNode } from "react";
 import { getJSON, sendJSON } from "./api";
 import type {
-  ConversationData, Costs, ModelCardData, ModelsResponse, RuntimeSettings,
-  SystemStatus, TokenUsage, View,
+  ConversationData, Costs, ModelCardData, ModelsResponse, ProviderInfo,
+  RuntimeSettings, SystemStatus, TokenUsage, View,
 } from "./types";
 
 export type { View };
@@ -32,8 +32,15 @@ interface Store {
   models: ModelCardData[];
   modelsRecent: ModelCardData[];
   modelsCategories: string[];
+  providerCaps: ModelsResponse["provider_caps"];
   modelsLoaded: boolean;
   refreshModels: () => Promise<void>;
+
+  providers: ProviderInfo[];
+  providersLoaded: boolean;
+  refreshProviders: () => Promise<void>;
+  saveProviderKey: (name: string, key: string) => Promise<boolean>;
+  removeProviderKey: (name: string) => Promise<void>;
 
   conversations: ConversationData[];
   convSearch: string;
@@ -76,6 +83,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [models, setModels] = useState<ModelCardData[]>([]);
   const [modelsRecent, setModelsRecent] = useState<ModelCardData[]>([]);
   const [modelsCategories, setModelsCategories] = useState<string[]>([]);
+  const [providerCaps, setProviderCaps] = useState<ModelsResponse["provider_caps"]>({});
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [providersLoaded, setProvidersLoaded] = useState(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [conversations, setConversations] = useState<ConversationData[]>([]);
   const [convSearch, setConvSearch] = useState("");
@@ -123,9 +133,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setModels(data.models);
       setModelsRecent(data.recent);
       setModelsCategories(data.categories);
+      setProviderCaps(data.provider_caps ?? {});
       setModelsLoaded(true);
     } catch { /* keep old */ }
   }, []);
+
+  const refreshProviders = useCallback(async () => {
+    try {
+      const data = await getJSON<{ providers: ProviderInfo[] }>("/api/providers");
+      setProviders(data.providers);
+      setProvidersLoaded(true);
+    } catch { /* keep old */ }
+  }, []);
+
+  const saveProviderKey = useCallback(async (name: string, key: string) => {
+    try {
+      const r = await sendJSON<{ configured: boolean; status: string; detail?: string | null }>(
+        "POST", `/api/providers/${name}/key`, { api_key: key });
+      if (r.status === "running") notify(`API key saved · ${name} online`, "good");
+      else notify(`Key stored, but ${name} reported: ${r.detail ?? r.status}`, "bad");
+      await refreshProviders();
+      await refreshModels();
+      return r.status === "running";
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Failed to save key", "bad");
+      return false;
+    }
+  }, [notify, refreshProviders, refreshModels]);
+
+  const removeProviderKey = useCallback(async (name: string) => {
+    try {
+      await sendJSON("DELETE", `/api/providers/${name}/key`);
+      notify(`API key removed (${name})`);
+      await refreshProviders();
+      await refreshModels();
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Failed to remove key", "bad");
+    }
+  }, [notify, refreshProviders, refreshModels]);
 
   const refreshConversations = useCallback(async () => {
     const q = searchRef.current.trim();
@@ -187,8 +232,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // boot + polling
   useEffect(() => { void refreshSettings(); }, [refreshSettings]);
-  useEffect(() => { void refreshSystem(); void refreshCosts(); void refreshTokens(); void refreshModels(); },
-    [refreshSystem, refreshCosts, refreshTokens, refreshModels]);
+  useEffect(() => { void refreshSystem(); void refreshCosts(); void refreshTokens(); void refreshModels(); void refreshProviders(); },
+    [refreshSystem, refreshCosts, refreshTokens, refreshModels, refreshProviders]);
   useEffect(() => {
     const t = window.setInterval(() => { void refreshSystem(); }, 10000);
     return () => window.clearInterval(t);
@@ -207,15 +252,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       notify("Settings saved", "good");
     },
     system, refreshSystem, costs, refreshCosts, tokens, refreshTokens,
-    models, modelsRecent, modelsCategories, modelsLoaded, refreshModels,
+    models, modelsRecent, modelsCategories, providerCaps, modelsLoaded, refreshModels,
+    providers, providersLoaded, refreshProviders, saveProviderKey, removeProviderKey,
     conversations, convSearch, setConvSearch, showArchived, setShowArchived,
     refreshConversations, activeId, setActiveId, activeConv, setActiveConv,
     currentModel, setCurrentModel, leftOpen, rightOpen, toggleLeft, toggleRight,
     settingsOpen, setSettingsOpen, toasts, notify,
     archiveConversation, removeConversation, patchConversation,
   }), [view, settings, refreshSettings, system, refreshSystem, costs, refreshCosts,
-    tokens, refreshTokens, models, modelsRecent, modelsCategories, modelsLoaded,
-    refreshModels, conversations, convSearch, showArchived, refreshConversations,
+    tokens, refreshTokens, models, modelsRecent, modelsCategories, providerCaps,
+    modelsLoaded, refreshModels, providers, providersLoaded, refreshProviders,
+    saveProviderKey, removeProviderKey,
+    conversations, convSearch, showArchived, refreshConversations,
     activeId, setActiveId, activeConv, currentModel, setCurrentModel, leftOpen,
     rightOpen, toggleLeft, toggleRight, settingsOpen, toasts, notify,
     archiveConversation, removeConversation, patchConversation]);

@@ -62,8 +62,9 @@ async def test_providers_endpoint(api):
 
 
 async def test_future_features_return_501_not_implemented(api):
-    for path in ("/api/agent/run", "/api/team/start", "/api/research/query",
-                 "/api/git/status"):
+    # Agent/Projects/Compare/Team/Research graduated to real implementations
+    # (P3/P4/P5/P6) — only git must still 501.
+    for path in ("/api/git/status",):
         r = await api.client.get(path)
         assert r.status_code == 501, path
         body = r.json()
@@ -71,6 +72,13 @@ async def test_future_features_return_501_not_implemented(api):
         assert "NOT IMPLEMENTED" in body["error"]["message"]
         r2 = await api.client.post(path, json={})
         assert r2.status_code == 501
+
+
+async def test_research_graduated_from_501(api):
+    # research is a real API surface since P6 — history works without network
+    r = await api.client.get("/api/research/history")
+    assert r.status_code == 200
+    assert r.json()["runs"] == []
 
 
 async def test_unknown_api_route_shape(api):

@@ -167,6 +167,11 @@ export function RightInspector() {
         <Row label="Latency" value={ollama?.latency_ms != null ? `${ollama.latency_ms.toFixed(0)} ms` : "Unknown"} />
         <Row label="Host" value={<span className="text-[10.5px]">{ollama?.host ?? "Unknown"}</span>} />
         <Row label="Models installed" value={ollama?.models_count != null ? formatNumber(ollama.models_count) : "Unknown"} />
+        {(system?.providers ?? []).filter((p) => !p.is_local).map((p) => (
+          <Row key={p.name} label={p.display_name}
+            tone={p.configured && p.last_status === "running" ? "text-good" : "text-warn"}
+            value={p.configured ? (p.last_status ?? "unknown") : "no key"} />
+        ))}
         <div className="h-px bg-line my-1.5" />
         <Row label="API uptime"
           value={system ? `${Math.floor(system.metrics.uptime_s / 60)}m ${Math.floor(system.metrics.uptime_s % 60)}s` : "Unknown"} />

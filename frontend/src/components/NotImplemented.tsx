@@ -1,30 +1,8 @@
 // Honest placeholder for future-phase features — never a fake demo.
 import { useStore, type View } from "../store";
-import {
-  BotIcon, FolderIcon, GitIcon, ModelsIcon, ResearchIcon, UsersIcon,
-} from "../icons";
+import { GitIcon, ModelsIcon } from "../icons";
 
 const INFO: Record<string, { title: string; icon: React.ReactNode; phase: string; body: string }> = {
-  agent: {
-    title: "Agent Mode", phase: "Phase 4",
-    icon: <BotIcon className="w-7 h-7" />,
-    body: "Autonomous task execution with a file-system sandbox, allow-listed commands, permission checks and a full audit log. The security foundation is already in place.",
-  },
-  team: {
-    title: "Team Mode — Multi-Model AI Team", phase: "Phase 5",
-    icon: <UsersIcon className="w-7 h-7" />,
-    body: "The flagship feature: 2–4 models analyze one complex task together, create a master plan, divide work by strength, review each other, test, fix and deliver. Database foundations (teams, team_members, tasks, per-model token tracking) are already migrated.",
-  },
-  research: {
-    title: "Research Mode", phase: "Phase 6",
-    icon: <ResearchIcon className="w-7 h-7" />,
-    body: "Structured research workspace: questions, source tracking, synthesis and reports. The research table already exists in the schema.",
-  },
-  projects: {
-    title: "Projects", phase: "Phase 4",
-    icon: <FolderIcon className="w-7 h-7" />,
-    body: "Project workspaces with files, tasks and context that chats, agents and teams can attach to. Projects and files tables already exist in the schema.",
-  },
   git: {
     title: "Git / GitHub Integration", phase: "Phase 7",
     icon: <GitIcon className="w-7 h-7" />,
@@ -34,7 +12,7 @@ const INFO: Record<string, { title: string; icon: React.ReactNode; phase: string
 
 export function NotImplemented({ view }: { view: View }) {
   const { setView } = useStore();
-  const info = INFO[view] ?? INFO.agent;
+  const info = INFO[view] ?? INFO.git;
   return (
     <div className="flex-1 flex items-center justify-center px-6">
       <div className="glass rounded-2xl max-w-[520px] w-full p-8 text-center anim-fade-up">

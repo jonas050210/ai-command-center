@@ -10,3 +10,9 @@ cryptography==44.0.2
 # test suite
 pytest==8.3.5
 pytest-asyncio==0.26.0
+
+# research / web mode (P6)
+ddgs==9.15.0
+trafilatura==2.2.0
+lxml==6.1.2
+lxml_html_clean==0.4.5

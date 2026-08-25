@@ -30,11 +30,13 @@ function Stat({ label, value, title }: { label: string; value: string; title?: s
 }
 
 function ModelCard({ model, onChanged }: { model: ModelCardData; onChanged: () => void }) {
-  const { currentModel, setCurrentModel, setView, notify } = useStore();
+  const { currentModel, setCurrentModel, setView, notify, providerCaps } = useStore();
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<ModelTestResult | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const selected = currentModel === model.name;
+  const caps = providerCaps[model.provider];
+  const canDelete = caps ? caps.delete : model.is_local;
 
   const runTest = async () => {
     setTesting(true);
@@ -129,7 +131,7 @@ function ModelCard({ model, onChanged }: { model: ModelCardData; onChanged: () =
           onClick={() => void runTest()} title="Run one real inference and measure speed">
           <GaugeIcon className="w-3.5 h-3.5" /> {testing ? "Testing…" : "Test"}
         </button>
-        {confirmDelete ? (
+        {canDelete && (confirmDelete ? (
           <>
             <button className="btn btn-danger !text-[10.5px] !px-2" title="Confirm delete"
               onClick={async () => {
@@ -144,18 +146,19 @@ function ModelCard({ model, onChanged }: { model: ModelCardData; onChanged: () =
             <button className="btn btn-ghost !text-[10.5px] !px-2" onClick={() => setConfirmDelete(false)}>No</button>
           </>
         ) : (
-          <button className="btn btn-ghost !px-2" title="Delete from Ollama"
+          <button className="btn btn-ghost !px-2" title={`Delete from ${model.provider}`}
             onClick={() => setConfirmDelete(true)}>
             <TrashIcon className="w-3.5 h-3.5" />
           </button>
-        )}
+        ))}
       </div>
     </div>
   );
 }
 
 export function ModelCenter() {
-  const { system, refreshSystem, notify } = useStore();
+  const { system, refreshSystem, notify, providerCaps } = useStore();
+  const anyPull = Object.values(providerCaps).some((c) => c.pull);
   const [data, setData] = useState<{ models: ModelCardData[]; recent: ModelCardData[]; categories: string[] }>({
     models: [], recent: [], categories: [],
   });
@@ -270,7 +273,8 @@ export function ModelCenter() {
         </div>
       )}
 
-      {/* pull */}
+      {/* pull — only when a registered provider supports it */}
+      {anyPull && (
       <div className="glass rounded-xl p-3 mb-5 flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <DatabaseIcon className="w-4 h-4 text-accent shrink-0" />
@@ -297,6 +301,7 @@ export function ModelCenter() {
           )}
         </div>
       </div>
+      )}
 
       {/* categories */}
       <div className="flex flex-wrap gap-1.5 mb-4">

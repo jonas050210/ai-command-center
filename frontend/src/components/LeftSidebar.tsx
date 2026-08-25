@@ -5,9 +5,9 @@ import { useStore } from "../store";
 import type { ConversationData, View } from "../types";
 import { cx, formatNumber, timeAgo } from "../utils";
 import {
-  ArchiveIcon, BotIcon, ChatIcon, CheckIcon, EditIcon, FolderIcon, GitIcon,
-  ModelsIcon, PinIcon, PlusIcon, ResearchIcon, SearchIcon, StarIcon, TrashIcon,
-  UsersIcon, XIcon,
+  ArchiveIcon, BotIcon, ChatIcon, CheckIcon, EditIcon, FolderIcon, GaugeIcon,
+  GitIcon, ModelsIcon, PinIcon, PlusIcon, ResearchIcon, SearchIcon, StarIcon,
+  TrashIcon, UsersIcon, XIcon,
 } from "../icons";
 
 function NavItem({ view, icon, label, soon }: {
@@ -156,10 +156,11 @@ export function LeftSidebar() {
         <nav className="space-y-[2px] pt-1">
           <NavItem view="chat" icon={<ChatIcon className="w-4 h-4" />} label="Chat" />
           <NavItem view="models" icon={<ModelsIcon className="w-4 h-4" />} label="Model Center" />
-          <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" soon />
-          <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" soon />
-          <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" soon />
-          <NavItem view="projects" icon={<FolderIcon className="w-4 h-4" />} label="Projects" soon />
+          <NavItem view="agent" icon={<BotIcon className="w-4 h-4" />} label="Agent Mode" />
+          <NavItem view="compare" icon={<GaugeIcon className="w-4 h-4" />} label="Compare Mode" />
+          <NavItem view="team" icon={<UsersIcon className="w-4 h-4" />} label="Team Mode" />
+          <NavItem view="research" icon={<ResearchIcon className="w-4 h-4" />} label="Research" />
+          <NavItem view="projects" icon={<FolderIcon className="w-4 h-4" />} label="Projects" />
           <NavItem view="git" icon={<GitIcon className="w-4 h-4" />} label="Git / GitHub" soon />
         </nav>
       </div>
@@ -203,16 +204,6 @@ export function LeftSidebar() {
         </div>
       </div>
 
-      <div className="p-3 border-t border-line">
-        <div className="glass-soft rounded-lg px-3 py-2 flex items-center gap-2.5">
-          <FolderIcon className="w-4 h-4 text-faint shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-[11.5px] text-dim font-medium">Projects</div>
-            <div className="text-[9.5px] text-faint">Workspace management</div>
-          </div>
-          <span className="chip chip-warn !text-[8.5px] !px-1.5 !py-[1px]">NOT IMPLEMENTED</span>
-        </div>
-      </div>
     </aside>
   );
 }

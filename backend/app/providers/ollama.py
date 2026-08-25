@@ -36,6 +36,8 @@ class OllamaProvider(Provider):
     is_local = True
     cost_input_per_mtok = 0.0     # local inference is free
     cost_output_per_mtok = 0.0
+    supports_pull = True
+    supports_delete = True
 
     def __init__(self, base_url: str, timeout: float = 300.0,
                  client_factory: ClientFactory | None = None):
@@ -147,12 +149,29 @@ class OllamaProvider(Provider):
         return info
 
     # ── chat (streaming) ─────────────────────────────────────────────
+    @staticmethod
+    def _serialize_message(m: ChatMessage) -> dict[str, Any]:
+        msg: dict[str, Any] = {"role": m.role, "content": m.content}
+        if m.role == "assistant" and m.tool_calls:
+            calls = []
+            for c in m.tool_calls:
+                fn = c.get("function") or {}
+                args = fn.get("arguments")
+                calls.append({"function": {
+                    "name": fn.get("name"),
+                    # Ollama wants arguments as an object, not a JSON string
+                    "arguments": args if isinstance(args, dict) else json.loads(args or "{}")}})
+            msg["tool_calls"] = calls
+        if m.role == "tool" and m.name:
+            msg["tool_name"] = m.name       # Ollama addresses results by tool_name
+        return msg
+
     async def chat_stream(self, model: str, messages: list[ChatMessage],
                           options: ChatOptions,
                           cancel: asyncio.Event) -> AsyncIterator[StreamChunk]:
         payload: dict[str, Any] = {
             "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [self._serialize_message(m) for m in messages],
             "stream": True,
         }
         opts: dict[str, Any] = {}
@@ -160,10 +179,16 @@ class OllamaProvider(Provider):
             opts["num_ctx"] = options.num_ctx
         if options.temperature is not None:
             opts["temperature"] = options.temperature
+        if options.max_tokens:
+            opts["num_predict"] = options.max_tokens
         if opts:
             payload["options"] = opts
         if options.keep_alive:
             payload["keep_alive"] = options.keep_alive
+        if options.tools:
+            payload["tools"] = options.tools
+        if options.format:
+            payload["format"] = options.format
 
         client = self._factory()
         response: httpx.Response | None = None
@@ -192,12 +217,28 @@ class OllamaProvider(Provider):
                     raise ProviderError(f"Ollama error: {data['error']}")
                 msg = data.get("message") or {}
                 done = bool(data.get("done"))
+                raw_calls = msg.get("tool_calls") or []
+                calls: list[dict[str, Any]] | None = None
+                if raw_calls:
+                    calls = []
+                    for i, c in enumerate(raw_calls):
+                        fn = (c or {}).get("function") or {}
+                        args = fn.get("arguments")
+                        if not isinstance(args, dict):
+                            try:
+                                args = json.loads(args) if args else {}
+                            except json.JSONDecodeError:
+                                args = {"_raw": args}
+                        calls.append({"id": f"call_{i}", "type": "function",
+                                      "function": {"name": fn.get("name"),
+                                                   "arguments": args}})
                 yield StreamChunk(
                     content=msg.get("content", "") or "",
                     done=done,
                     input_tokens=data.get("prompt_eval_count") if done else None,
                     output_tokens=data.get("eval_count") if done else None,
                     eval_duration_ns=data.get("eval_duration") if done else None,
+                    tool_calls=calls,
                 )
                 if done:
                     return

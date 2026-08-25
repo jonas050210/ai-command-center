@@ -4,6 +4,11 @@ import { Header } from "./components/Header";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RightInspector } from "./components/RightInspector";
 import { ChatView } from "./components/ChatView";
+import { AgentView } from "./components/AgentView";
+import { CompareView } from "./components/CompareView";
+import { TeamView } from "./components/TeamView";
+import { ResearchView } from "./components/ResearchView";
+import { ProjectsView } from "./components/ProjectsView";
 import { ModelCenter } from "./components/ModelCenter";
 import { SettingsDrawer } from "./components/SettingsDrawer";
 import { NotImplemented } from "./components/NotImplemented";
@@ -30,8 +35,14 @@ export default function App() {
         {leftOpen && <LeftSidebar />}
         <main className="flex-1 min-w-0 flex flex-col min-h-0">
           {view === "chat" && <ChatView />}
+          {view === "agent" && <AgentView />}
+          {view === "compare" && <CompareView />}
+          {view === "team" && <TeamView />}
+          {view === "research" && <ResearchView />}
+          {view === "projects" && <ProjectsView />}
           {view === "models" && <ModelCenter />}
-          {view !== "chat" && view !== "models" && <NotImplemented view={view} />}
+          {!["chat", "agent", "compare", "team", "research", "projects", "models"].includes(view)
+            && <NotImplemented view={view} />}
         </main>
         {rightOpen && view === "chat" && <RightInspector />}
       </div>

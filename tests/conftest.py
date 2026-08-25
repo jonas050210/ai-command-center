@@ -21,7 +21,10 @@ from backend.app.providers.registry import ProviderRegistry           # noqa: E4
 from backend.app.services.cost_guard import CostGuard                 # noqa: E402
 from backend.app.services.model_router import ModelRouter             # noqa: E402
 from backend.app.services.settings_service import SettingsService     # noqa: E402
-from backend.app.db.repo import ModelsRepo, SettingsRepo              # noqa: E402
+from backend.app.db.repo import ExecutionsRepo, ModelsRepo, SettingsRepo  # noqa: E402
+from backend.app.tools.builtin import register_builtin_tools          # noqa: E402
+from backend.app.tools.executor import ToolExecutor                   # noqa: E402
+from backend.app.tools.registry import ToolContext, ToolRegistry      # noqa: E402
 
 
 # ── settings / db ────────────────────────────────────────────────────
@@ -49,6 +52,8 @@ class FakeOllamaProvider(Provider):
     is_local = True
     cost_input_per_mtok = 0.0
     cost_output_per_mtok = 0.0
+    supports_pull = True
+    supports_delete = True
 
     def __init__(self, reply: str = "Hello from a fake local model.",
                  running: bool = True):
@@ -56,6 +61,8 @@ class FakeOllamaProvider(Provider):
         self.running = running
         self.chat_calls = 0
         self.deleted: list[str] = []
+        self.last_options: ChatOptions | None = None
+        self.last_tools: list | None = None
 
     async def status(self) -> ProviderStatus:
         if not self.running:
@@ -89,6 +96,7 @@ class FakeOllamaProvider(Provider):
                           options: ChatOptions,
                           cancel: asyncio.Event) -> AsyncIterator[StreamChunk]:
         self.chat_calls += 1
+        self.last_options = options
         prompt_tokens = sum(max(1, len(m.content) // 4) + 4 for m in messages)
         for word in self.reply.split(" "):
             if cancel.is_set():
@@ -158,6 +166,20 @@ class Simple:
         self.__dict__.update(kw)
 
 
+@pytest.fixture
+async def tools_env(db, tmp_path):
+    """Tool registry + gateway executor + sandbox workspace (no HTTP)."""
+    registry = ToolRegistry()
+    register_builtin_tools(registry)
+    executions = ExecutionsRepo(db)
+    executor = ToolExecutor(registry, executions)
+    ctx = ToolContext(workspace_root=tmp_path / "ws", run_id="run-test")
+    ctx.workspace_root.mkdir(parents=True, exist_ok=True)
+    approve_all = lambda spec, args, preview: asyncio.sleep(0, result=True)  # noqa: E731
+    return Simple(registry=registry, executor=executor, ctx=ctx,
+                  executions=executions, approve_all=approve_all)
+
+
 # ── API client ───────────────────────────────────────────────────────
 @pytest.fixture
 async def api(tmp_path, fake_ollama):
@@ -173,8 +195,10 @@ async def api(tmp_path, fake_ollama):
     # lifespan normally does this:
     await svc.db.connect()
     await migrate(svc.db)
+    # base_url must be a loopback host: the Host-header guard (P0) rejects
+    # anything outside the allowlist, exactly as in production.
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         yield Simple(client=client, app=app, svc=svc, ollama=fake_ollama,
                      settings=settings)
     await svc.db.close()

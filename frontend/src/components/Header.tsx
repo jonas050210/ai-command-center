@@ -41,6 +41,21 @@ export function Header() {
         )}
       </div>
 
+      {/* Cloud providers (OpenRouter) — never silently active */}
+      {(system?.providers ?? []).filter((p) => !p.is_local).map((p) => {
+        const online = p.configured && p.last_status === "running";
+        return (
+          <div key={p.name} className="chip"
+            title={p.configured ? `${p.display_name} · ${p.last_status ?? "unknown"}` : `${p.display_name} · no API key stored`}>
+            <span className={`inline-block w-[7px] h-[7px] rounded-full ${online ? "bg-good" : "bg-warn"}`} />
+            <span>{p.name}</span>
+            <span className="text-ink font-semibold">
+              {p.configured ? (p.last_status === "running" ? "online" : p.last_status ?? "unknown") : "no key"}
+            </span>
+          </div>
+        );
+      })}
+
       {/* €0 protection */}
       <div className={`chip ${freeOnly ? "chip-good" : "chip-warn"}`}
         title="Strict €0 cost protection — enforced in the backend before any provider request">

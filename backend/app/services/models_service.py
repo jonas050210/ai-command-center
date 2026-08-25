@@ -21,12 +21,19 @@ TEST_PROMPT = "Reply with exactly: OK"
 
 
 class ModelsService:
-    def __init__(self, models: ModelsRepo, providers: ProvidersRepo):
+    def __init__(self, models: ModelsRepo, providers: ProvidersRepo,
+                 settings: "SettingsService | None" = None):
         self.models = models
         self.providers = providers
+        self.settings = settings
 
     async def sync_from_provider(self, provider: Provider) -> dict:
         """Discover models from the runtime and upsert them."""
+        # Cloud providers price in USD — push the current FX rate before
+        # converting to EUR (single source: runtime settings).
+        set_fx = getattr(provider, "set_fx_rate", None)
+        if set_fx is not None and self.settings is not None:
+            set_fx(await self.settings.get_typed("eur_per_usd"))
         await self.providers.upsert(provider.name, provider.display_name,
                                     provider.is_local, provider.base_url if hasattr(provider, "base_url") else None,
                                     provider.cost_input_per_mtok, provider.cost_output_per_mtok)
@@ -48,7 +55,8 @@ class ModelsService:
                 "family": info.family, "families": info.families,
                 "capabilities": info.capabilities,
                 "categories": classify_model(info.name, info.families, info.capabilities,
-                                             info.parameter_size),
+                                             info.parameter_size, is_local=info.is_local,
+                                             is_free=info.is_free),
                 "available": True, "status": "available", "raw": info.raw,
             }
             await self.models.upsert_from_provider(row)
@@ -64,6 +72,8 @@ class ModelsService:
         row = await self.models.get(provider.name, name)
         if row is None:
             raise NotFound(f"Model '{name}' is not in the catalog. Refresh first.")
+        if row.get("context_length"):
+            num_ctx = min(num_ctx, int(row["context_length"]))  # never over-request ctx
         t0 = time.monotonic()
         final = None
         cancel = asyncio.Event()
@@ -73,11 +83,9 @@ class ModelsService:
             if chunk.done:
                 final = chunk
         latency_ms = round((time.monotonic() - t0) * 1000, 1)
-        out_tok = final.output_tokens if final else None
+        out_tok = final.output_tokens if final else None   # None → stays "Unknown"
         in_tok = final.input_tokens if final else None
         tps = final.output_tps if final else None
-        if out_tok is None and final is not None:
-            out_tok = None  # runtime didn't report → stay honest
         await self.models.record_usage(provider.name, name, in_tok or 0, out_tok or 0, tps)
         return {
             "model": name, "provider": provider.name,

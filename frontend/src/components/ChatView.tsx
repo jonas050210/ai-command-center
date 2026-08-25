@@ -26,6 +26,7 @@ export function ChatView() {
   const [loading, setLoading] = useState(false);
   const [stream, setStream] = useState<StreamState | null>(null);
   const [bannerError, setBannerError] = useState<{ code: string; message: string } | null>(null);
+  const [compactedNote, setCompactedNote] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const streamingRef = useRef(false);
@@ -69,6 +70,7 @@ export function ChatView() {
   // ── shared stream consumer ───────────────────────────────────────
   const consume = useCallback(async (url: string, body: unknown, optimisticUser?: string) => {
     setBannerError(null);
+    setCompactedNote(false);
     const controller = new AbortController();
     abortRef.current = controller;
     streamingRef.current = true;
@@ -96,6 +98,7 @@ export function ChatView() {
           state = { ...state, requestId: ev.request_id, assistantId: ev.assistant_message_id,
             conversationId: ev.conversation_id, model: ev.model };
           setStream({ ...state });
+          if (ev.compacted) setCompactedNote(true);
           if (!activeId) setActiveId(ev.conversation_id);
           void refreshConversations();
         } else if (ev.type === "delta") {
@@ -242,6 +245,12 @@ export function ChatView() {
             onRegenerate={regenerate} />
         ))}
 
+        {compactedNote && (
+          <div className="mx-6 mb-2 text-[10.5px] text-faint flex items-center gap-1.5 anim-fade-in">
+            <AlertIcon className="w-3 h-3 shrink-0" />
+            Context compacted — earlier turns were summarized to fit the model's context window.
+          </div>
+        )}
         {stream && <StreamingBubble content={stream.content} model={stream.model || "assistant"} />}
         <div className="h-2" />
       </div>

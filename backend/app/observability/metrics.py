@@ -19,6 +19,7 @@ class Metrics:
     session_input_tokens: int = 0
     session_output_tokens: int = 0
     session_cost_eur: float = 0.0
+    last_request_cost_eur: float = 0.0
 
     def uptime_s(self) -> float:
         return round(time.time() - self.started_at, 1)

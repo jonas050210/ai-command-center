@@ -1,15 +1,8 @@
-"""Agent Mode — boundary module for a later phase.
+"""Agent Mode (P3) — real, gateway-guarded autonomous runs.
 
-Status: NOT IMPLEMENTED. The API router exposes this boundary at
-``/api/agent`` and returns HTTP 501 so nothing ever pretends to work.
-When implemented, the agent engine will live here and will execute
-ONLY through security.permissions (capability checks) + tools.audit
-(execution logging) inside workspace/ boundaries.
+The engine lives in ``agent.engine``. Every machine-facing action a
+model proposes passes: permission policy (security.permissions) →
+argument validation → human approval (write/exec tiers) → sandboxed
+execution (workspace/) → an audit row in ``executions``. Nothing reaches
+the machine outside this path.
 """
-from ..core.errors import FeatureNotImplemented
-
-
-def unavailable() -> None:
-    raise FeatureNotImplemented(
-        "Agent Mode is NOT IMPLEMENTED in this phase. "
-        "It is a planned feature — see ROADMAP (Phase 4).")

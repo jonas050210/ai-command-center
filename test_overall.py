@@ -248,7 +248,7 @@ def run_system_tests() -> bool:
         record("chat stop endpoint (404 for unknown id)",
                code == 404 and json.loads(stop)["error"]["code"] == "REQUEST_NOT_FOUND")
 
-        code, future = http("GET", "/api/team/start")
+        code, future = http("GET", "/api/git/status")
         body = json.loads(future)
         record("future features: 501 NOT IMPLEMENTED",
                code == 501 and body["error"]["code"] == "NOT_IMPLEMENTED")

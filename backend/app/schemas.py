@@ -43,9 +43,78 @@ class SettingsUpdate(BaseModel):
     free_only: bool | None = None
     max_spend: float | None = Field(default=None, ge=0.0)
     default_model: str | None = None
+    default_provider: str | None = None
     num_ctx: int | None = Field(default=None, ge=512)
     keep_alive: str | None = None
     custom_instructions: str | None = Field(default=None, max_length=8000)
+    eur_per_usd: float | None = Field(default=None, ge=0.2, le=5.0)
+
+
+class ProviderKeyRequest(BaseModel):
+    api_key: str = Field(min_length=1, max_length=512)
+
+
+class SettingsUpdateExt(SettingsUpdate):
+    cap_filesystem_read: bool | None = None
+    cap_filesystem_write: bool | None = None
+    cap_command_execute: bool | None = None
+    cap_network_fetch: bool | None = None
+    cap_git_operate: bool | None = None
+
+
+class AgentRunRequest(BaseModel):
+    task: str = Field(min_length=1, max_length=20000)
+    provider: str | None = None
+    model: str | None = None
+    skills: str | None = Field(default=None, max_length=20000)
+    project_id: int | None = None
+
+
+class ProjectCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    description: str = Field(default="", max_length=4000)
+
+
+class ProjectUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    description: str | None = Field(default=None, max_length=4000)
+    status: str | None = Field(default=None, pattern="^(active|archived)$")
+
+
+class CompareRunRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=20000)
+    models: list[str] = Field(min_length=2, max_length=4)
+    # each entry: "<provider>/<model>" or bare "<model>" (catalog-resolved)
+
+
+class TeamMemberSpec(BaseModel):
+    role: str = Field(pattern="^(planner|executor|reviewer)$")
+    model: str = Field(min_length=1, max_length=200)
+    provider: str | None = None
+    responsibility: str = Field(default="", max_length=1000)
+
+
+class TeamCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    members: list[TeamMemberSpec] = Field(min_length=2, max_length=4)
+
+
+class TeamRunRequest(BaseModel):
+    task: str = Field(min_length=1, max_length=20000)
+
+
+class ResearchQueryRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    model: str | None = None
+    provider: str | None = None
+
+
+class AgentStopRequest(BaseModel):
+    run_id: str
+
+
+class ApprovalDecisionRequest(BaseModel):
+    approve: bool
 
 
 class ModelTestRequest(BaseModel):
