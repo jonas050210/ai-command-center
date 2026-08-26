@@ -1,12 +1,12 @@
 # AI Command Center — PROJECT.md
 
 **The complete project document.** Everything about this codebase in one place:
-what it is, what it does, how it is built, file by file, exactly how it was
-verified, what it cost to build (€0 infra, local-first), and its honest limits.
+what it is, what it does, how it is built, file by file, how it is verified,
+what it cost to build (€0 infra, local-first), and its honest limits.
 
 - **Version:** 0.15.0 · **Status:** all roadmap phases P0–P13 complete
-- **Tests:** pytest + frontend `tsc --noEmit` + production build — see test_overall.py ·
-  production build clean · live end-to-end smokes 19/19 + 21/21 + 14/14
+- **Tests:** pytest + frontend `tsc --noEmit` + production build — see test_overall.py
+  (point-in-time results; re-run on your machine)
 - **Repo:** `jonas050210/ai-command-center` · branch of record: this session's
   working branch · **Platform target:** Windows 11 (works on Linux/macOS)
 - **Built for:** Intel i7-12700F · RTX 4060 Ti 8GB · 32GB RAM · Python 3.11 · Node 22
@@ -31,7 +31,7 @@ models into a complete working environment:
 | **Git/GitHub** | Real git ops inside the sandbox + GitHub REST via vaulted PAT |
 | **Memory & Skills** | Persistent memories + AGENT.md standing instructions |
 | **Model Center** | Live catalog, speed tests, pull/delete, favorites, costs |
-| **Desktop** | Windows EXE (PyInstaller) + Inno Setup installer + CI release |
+| **Desktop** | Windows EXE (PyInstaller) + Inno Setup installer |
 
 **Hard product rules (never broken):**
 1. **No fake features.** Every button is wired UI → API → service →
@@ -49,9 +49,13 @@ models into a complete working environment:
 
 ---
 
-## 2. Proof of quality (exact verification results)
+## 2. Proof of quality (verification snapshot)
 
-| Gate | Result |
+These are point-in-time results captured at the commit this document was
+last reconciled against. They are **not** re-run automatically — re-run
+`python test_overall.py` on your machine to confirm before trusting them.
+
+| Gate | Result (snapshot) |
 |---|---|
 | Backend pytest (unit + API + SSE flows, all networks faked) | **239 passed, 0 failed** |
 | Frontend typecheck (`tsc --noEmit`, strict TS) | **clean** |
@@ -62,12 +66,8 @@ models into a complete working environment:
 | Desktop smoke (`main_desktop.py --smoke`) | **exit 0, backend healthy** |
 | `test_overall.py` 4-suite runner | backend tests → tsc → build → e2e, all green |
 
-Per-file test counts (239 total): `test_agent 26 · test_research 36 ·
-test_openrouter 19 · test_guards 23 · test_git 20 · test_chat_api 13 ·
-test_memory 11 · test_desktop 11 · test_providers 11 · test_models_api 9 ·
-test_system_api 9 · test_security 8 · test_database 8 · test_team 7 ·
-test_conversations_api 6 · test_cost_guard 6 · test_compare 5 ·
-test_projects 5 · test_config 3 · test_tokens 3`.
+Note: the per-file line counts in §4.10 are point-in-time; the authoritative
+pass count is what `test_overall.py` reports on your checkout.
 
 ---
 
@@ -144,10 +144,11 @@ to the model.
 
 ## 4. Complete file inventory (every file, line counts, purpose)
 
-All **144 git-tracked files** (~23.5k lines of source + docs, ~1 MB;
+All **150 git-tracked files** (~25.8k lines of source + docs, ~1 MB;
 `__pycache__`, `node_modules`, `dist`, caches, `.git` excluded). Every file is
-described below. Want every file **inlined verbatim in one document**? Generate
-the snapshot anytime (output is a gitignored artifact, never hand-edited):
+described below; line counts are a point-in-time snapshot (re-run `wc -l` to
+refresh). Want every file **inlined verbatim in one document**? Generate the
+snapshot anytime (output is a gitignored artifact, never hand-edited):
 
 ```bash
 python tools/export_source.py   # → FULLSOURCE.md
@@ -161,10 +162,9 @@ python tools/export_source.py   # → FULLSOURCE.md
 | 68 | `start.py` | Cross-platform launcher (prefers `.venv`, sets env) |
 | 94 | `setup.py` | Idempotent first-run setup (venv, deps, frontend build, `.env`) |
 | 312 | `test_overall.py` | The 4-suite system gate: pytest → tsc → vite build → e2e |
-| 130 | `tools/export_source.py` | Generates `FULLSOURCE.md` — every tracked file inlined verbatim (gitignored artifact) |
-| 138 | `README.md` | User-facing overview + quick start + config reference |
+| 125 | `tools/export_source.py` | Generates `FULLSOURCE.md` — every tracked file inlined verbatim (gitignored artifact) |
+| 73 | `README.md` | Quick start + config reference (lean; deep detail lives here in PROJECT.md) |
 | — | `PROJECT.md` | This document |
-| — | `ROADMAP` | Phase history P1–P10, all DONE |
 | — | `requirements.txt` | Backend deps (fastapi 0.115.12, uvicorn[standard] 0.34.2, pydantic 2.11.4, pydantic-settings 2.9.1, httpx 0.28.1, aiosqlite 0.21.0, cryptography 44.0.2, ddgs 9.15.0, trafilatura 2.2.0, lxml 6.1.2, lxml_html_clean 0.4.5, pytest 8.3.5, pytest-asyncio 0.26.0) |
 | — | `requirements-desktop.txt` | pyinstaller 6.11.1 · pywebview 5.4 |
 | — | `pytest.ini` | `asyncio_mode=auto`, test discovery |
@@ -176,19 +176,20 @@ python tools/export_source.py   # → FULLSOURCE.md
 | Lines | File | Purpose |
 |---|---|---|
 | 193 | `backend/app/config.py` | Settings (env/.env), `APP_VERSION`, frozen-app path resolution (`is_frozen`, `bundle_root`, `default_data_dir`) |
-| 258 | `backend/app/main.py` | App factory + composition root, middleware wiring, SPA static mount |
+| 268 | `backend/app/main.py` | App factory + composition root, middleware wiring, SPA static mount |
+| 195 | `backend/app/schemas.py` | Pydantic request/response schemas shared across routers |
 | 101 | `backend/app/core/errors.py` | `AppError` → one JSON error shape for every endpoint |
 | 81 | `backend/app/db/database.py` | aiosqlite connection management, WAL, migration runner |
-| 317 | `backend/app/db/migrations.py` | Migrations V1–V5 (V5 = `memories` table) |
-| 645 | `backend/app/db/repo.py` | Repository layer: conversations/messages/models/usage/executions/projects/research/teams/runs/approvals **and** MemoriesRepo |
+| 322 | `backend/app/db/migrations.py` | Migrations V1–V5 (V5 = `memories` table) |
+| 647 | `backend/app/db/repo.py` | Repository layer: conversations/messages/models/usage/executions/projects/research/teams/runs/approvals **and** MemoriesRepo |
 
 ### 4.3 Backend — providers
 
 | Lines | File | Purpose |
 |---|---|---|
-| 133 | `backend/app/providers/base.py` | Provider ABC: stream tool-capable chat, catalog, errors |
-| 301 | `backend/app/providers/ollama.py` | Ollama: NDJSON streaming, tool_calls, show/tags/pull/delete, speed test |
-| 403 | `backend/app/providers/openrouter.py` | OpenRouter: OpenAI-SSE streaming w/ usage, catalog, key validation |
+| 139 | `backend/app/providers/base.py` | Provider ABC: stream tool-capable chat, catalog, errors |
+| 343 | `backend/app/providers/ollama.py` | Ollama: NDJSON streaming, tool_calls, show/tags/pull/delete, speed test |
+| 401 | `backend/app/providers/openrouter.py` | OpenRouter: OpenAI-SSE streaming w/ usage, catalog, key validation |
 | 33 | `backend/app/providers/registry.py` | Named provider instances, capability listing |
 
 ### 4.4 Backend — services
@@ -202,23 +203,25 @@ python tools/export_source.py   # → FULLSOURCE.md
 | 29 | `backend/app/services/tokens.py` | Exact vs estimated token accounting helpers |
 | 102 | `backend/app/services/settings_service.py` | Runtime settings (type-checked, persisted, capability map) |
 | 121 | `backend/app/services/credentials_service.py` | Vault CRUD incl. non-provider scopes (github); provider key loading |
-| 117 | `backend/app/services/context.py` | Context-window management + honest compaction notes |
-| 130 | `backend/app/services/project_service.py` | Project lifecycle: slug-dedup, path-proven dirs, archive-only |
+| 116 | `backend/app/services/context.py` | Context-window management + honest compaction notes |
+| 233 | `backend/app/services/project_service.py` | Project lifecycle: slug-dedup, path-proven dirs, archive-only |
 | 174 | `backend/app/services/compare_service.py` | Compare runs: per-provider VRAM serialization, parallel clouds |
 
 ### 4.5 Backend — agent / team / research / gitops / memory
 
 | Lines | File | Purpose |
 |---|---|---|
-| 447 | `backend/app/agent/engine.py` | Tool-calling engine: max-steps, circuit breaker, stop, skills+memory prompt injection |
+| 496 | `backend/app/agent/engine.py` | Tool-calling engine: max-steps, circuit breaker, stop, skills+memory prompt injection |
 | 51 | `backend/app/agent/prompts.py` | Agent system prompt (capabilities, honesty, verdict rules) |
+| 131 | `backend/app/agent/snapshots.py` | Per-run file snapshot + undo — only the files a run mutated |
 | 349 | `backend/app/team/service.py` | Planner→executor(re-al agent runs)→reviewer pipelines, VERDICT parsing, 1 revision max |
 | 49 | `backend/app/team/prompts.py` | Planner/executor/reviewer prompt templates |
 | 223 | `backend/app/research/service.py` | Research runs: search→fetch→grounded answer w/ `[n]` citations, history |
 | 194 | `backend/app/research/web.py` | Web edge: DDG search + SSRF-guarded fetch + extraction + size caps |
-| 405 | `backend/app/gitops/service.py` | Git argv-subprocess service: status/diff/log/branch/commit/push/remote, containment + audit |
+| 422 | `backend/app/gitops/service.py` | Git argv-subprocess service: status/diff/log/branch/commit/push/remote, containment + audit |
 | 87 | `backend/app/gitops/github.py` | GitHub REST: user/repos/create-private; honest 401 |
 | 111 | `backend/app/memory/service.py` | Memory CRUD, AGENT.md read, skills chain ws→project, prompt blocks |
+| 317 | `backend/app/coder/service.py` | Coder Mode: sandboxed tree (capped), read-only file preview, git status, model profile |
 
 ### 4.6 Backend — tools / security / workspace / observability
 
@@ -240,37 +243,40 @@ python tools/export_source.py   # → FULLSOURCE.md
 
 | Lines | File | Endpoints |
 |---|---|---|
+| 8 | `routers/deps.py` | Shared FastAPI dependency: injects `Services` + auth | 
 | 32 | `routers/health.py` | `GET /api/health` |
 | 63 | `routers/system.py` | `/api/system/status`, metrics |
-| 30 | `routers/settings.py` | `GET|PUT /api/settings` |
+| 30 | `routers/settings.py` | `GET`/`PUT /api/settings` |
 | 49 | `routers/costs.py` | `/api/costs`, `/api/usage/tokens` |
 | 78 | `routers/providers.py` | `/api/providers`, key set/delete |
-| 174 | `routers/models.py` | catalog, refresh, test, pull (SSE), favorites, delete |
+| 192 | `routers/models.py` | catalog, refresh, test, pull (SSE), favorites, delete |
 | 86 | `routers/conversations.py` | CRUD, pin/star/archive, message listing |
 | 84 | `routers/chat.py` | completions / regenerate / stop (SSE) |
-| 117 | `routers/agent.py` | runs (SSE), stop, history, approvals answer, capabilities, tools, executions |
+| 132 | `routers/agent.py` | runs (SSE), stop, history, approvals answer, capabilities, tools, executions |
+| 55 | `routers/coder.py` | `GET /api/coder/profile` / `tree` / `file` |
 | 50 | `routers/projects.py` | CRUD + archive |
 | 39 | `routers/compare.py` | runs (SSE) |
 | 105 | `routers/team.py` | teams CRUD + runs (SSE) + stop |
 | 86 | `routers/research.py` | query (SSE), history, detail, stop |
 | 128 | `routers/git.py` | status/log/diff/branches/init/commit/push/remote + GitHub token/user/repos |
-| 84 | `routers/memory.py` | memories list/save/search/delete, AGENT.md file GET|PUT, context |
+| 84 | `routers/memory.py` | memories list/save/search/delete, AGENT.md file GET/PUT, context |
 
 ### 4.8 Frontend (React 18 + strict TS + Vite + Tailwind v4)
 
 | Lines | File | Purpose |
 |---|---|---|
 | 13 | `src/main.tsx` | Bootstrap |
-| 56 | `src/App.tsx` | Shell: header + 3 panels + overlays + `useGlobalShortcuts()` |
+| 67 | `src/App.tsx` | Shell: header + 3 panels + overlays + `useGlobalShortcuts()` |
 | 285 | `src/store.tsx` | Single context store (settings/system/costs/tokens/models/providers/conversations, panels, palette/help, toasts) |
 | 102 | `src/api.ts` | `getJSON/sendJSON/streamSSE` + `ApiError` (code+message) |
-| 391 | `src/types.ts` | All API types (mirrors backend schemas) |
+| 457 | `src/types.ts` | All API types (mirrors backend schemas) |
 | 115 | `src/utils.ts` | formatters, **one** timestamp parser (`parseTs`) reused by timeAgo/dayBucket/formatClock/dayLabel/sameDay, clipboard w/ fallback |
-| 353 | `src/styles.css` | Theme tokens, glass, buttons, chips, markdown, hljs, palette/kbd/day-sep, reduced-motion |
+| 400 | `src/styles.css` | Theme tokens, glass, buttons, chips, markdown, hljs, palette/kbd/day-sep, reduced-motion |
 | 58 | `src/icons.tsx` | Inline stroke icon set (currentColor) |
 | 95 | `components/Header.tsx` | Brand, palette trigger pill, Ollama/provider/€0/session chips |
 | 219 | `components/LeftSidebar.tsx` | Nav + chats: search, pin/star/rename/archive/delete, **date grouping** |
 | 290 | `components/ChatView.tsx` | Chat workspace: SSE streaming, banners, **day separators**, **jump-to-latest** |
+| 588 | `components/CoderView.tsx` | Coder workspace: file tree + read-only preview + git chip + run snapshot undo |
 | 155 | `components/Composer.tsx` | Model selector, autosize textarea, pre-send token estimate, send/stop, suggestions |
 | 124 | `components/MessageItem.tsx` | Bubbles, markdown, token chips, copy/regenerate, **timestamps** |
 | 80 | `components/Markdown.tsx` | GFM markdown + code blocks w/ copy (highlight.js) |
@@ -296,20 +302,20 @@ python tools/export_source.py   # → FULLSOURCE.md
 | 61 | `desktop/build.py` | Build driver: npm ci+build (if stale) → PyInstaller onedir |
 | — | `desktop/aicc_desktop.spec` | PyInstaller spec: onedir, SPA in `datas`, hidden imports pinned |
 | — | `desktop/installer.iss` | Inno Setup: per-user install, modern wizard, shortcuts, versioned filename |
-| — | `.github/workflows/release.yml` | Tag `v*` → Windows build: **pytest gates** → desktop build → frozen smoke → ISCC → artifacts + GitHub release |
-| — | `.github/workflows/ci.yml` | Push CI: pytest, pip-audit, tsc, vite build, npm audit, test_overall |
 
-### 4.10 Tests (239 pytest; live E2E harness beside repo in /tmp)
+### 4.10 Tests (pytest; live E2E harness runs beside the repo)
 
 | Lines | File | Focus |
 |---|---|---|
 | 214 | `tests/conftest.py` | Fixtures: in-memory app, faked providers, `tools_env` |
-| 508 | `tests/test_agent.py` | Engine, approvals, circuit breaker, tools registry, capabilities |
+| 502 | `tests/test_agent.py` | Engine, approvals, circuit breaker, tools registry, capabilities |
 | 433 | `tests/test_research.py` | Web edge (SSRF, caps, extraction), grounded answers, SSE run |
+| 154 | `tests/test_coder.py` | Coder tree/file endpoints, sandboxing, model profile |
 | 398 | `tests/test_openrouter.py` | Streaming, catalog, key flows, CostGuard interplay |
 | 322 | `tests/test_git.py` | Git ops, containment, remote policy, token hygiene, GitHub client |
 | 296 | `tests/test_guards.py` | Headers, host/origin, API token, rate limits |
-| 210 | `tests/test_team.py` | Pipelines, verdicts, revision cap, VRAM serialization |
+| 209 | `tests/test_team.py` | Pipelines, verdicts, revision cap, VRAM serialization |
+| 49 | `tests/test_snapshots.py` | Run snapshot / undo behaviour |
 | 193 | `tests/test_chat_api.py` | Chat SSE, regenerate/stop, titles, errors |
 | 185 | `tests/test_providers.py` | Ollama + registry behavior |
 | 181 | `tests/test_memory.py` | Memory CRUD, tools gating, AGENT.md chain, prompt injection |
@@ -374,14 +380,14 @@ Interactive docs: `/api/docs`.
 | P0–P6 | v0.8.0 | Hardening pass, **OpenRouter provider**, **context compaction**, **Agent Mode** (tools+approvals+audit), **Projects**, **Compare**, **Team**, **Research** |
 | P7 | v0.9.0 | **Git/GitHub** (sandboxed git + vaulted PAT + audit); deleted the old placeholder views |
 | P8 | v0.10.0 | **Memory & skills** (V5 migration, memory tools, AGENT.md chaining, Memory UI) |
-| P9 | v0.11.0 | **Windows distribution** (PyInstaller onedir, Inno installer, release CI, frozen-aware config, `--smoke`) |
+| P9 | v0.11.0 | **Windows distribution** (PyInstaller onedir, Inno installer, frozen-aware config, `--smoke`) |
 | P10 | v0.12.0 | **Final polish**: command palette (Ctrl+K), shortcuts system, date-grouped sidebar, chat day separators + jump-to-latest, timestamps, reduced-motion/focus a11y, PROJECT.md, docs refresh |
 | P11 | v0.13.0 | **Coder Mode**: project file tree + read-only preview, hardware-honest 8GB model profile, same agent gateway (no OpenCode process) |
 | P12 | v0.14.0 | **Real-repo Coder**: attach existing folder, auto-injected tree+git, loaded-model/GPU chip + unload, run snapshot undo |
+| P13 | v0.15.0 | **Command Deck UI**: ambient aurora + grid HUD, grouped nav, view-stage transitions, header overflow scroll, reduced-motion honored |
 
-Commits on this branch (newest first): `38fd717` P10 GUI+docs ·
-`b544855` P9 desktop · `f542633` P8 memory · `23fcbcf` P7 git ·
-`4099abd` P0–P6 · `f7136b8` v0.3.0 baseline.
+Development history lives in the git log (`git log`); the release/CI
+pipelines are **not yet checked into this repository** (planned, not present).
 
 ---
 
@@ -394,7 +400,7 @@ python start.py                 # http://127.0.0.1:8000
 
 python test_overall.py          # full 4-suite gate
 python desktop/build.py         # Windows: dist-desktop/AICommandCenter/…exe
-iscc desktop/installer.iss      # Windows: dist-installer/AICommandCenterSetup-0.12.0.exe
+iscc desktop/installer.iss      # Windows: dist-installer/AICommandCenterSetup-0.15.0.exe
 ```
 
 Keyboard: **Ctrl+K** palette · **Ctrl+B** sidebar · **Ctrl+.** inspector ·
@@ -407,9 +413,10 @@ Keyboard: **Ctrl+K** palette · **Ctrl+B** sidebar · **Ctrl+.** inspector ·
 1. **Research browse needs real outbound network.** In sandboxed/offline
    environments, fetches fail and the run says so (fails closed, never
    hallucinates).
-2. **Desktop EXE is built by CI/locally on Windows** — this dev sandbox can't
-   produce Windows binaries; the pipeline + spec + smoke test are ready and
-   tested from source (`--smoke` verified).
+2. **Desktop EXE is built locally on Windows** — this dev sandbox can't
+   produce Windows binaries; the spec + build driver + smoke test are ready and
+   testable from source (`--smoke` verified). A CI release pipeline is planned
+   but not yet checked into this repository.
 3. **pywebview** needs a system WebView2 runtime on Windows (present on
    Win11); without it the app falls back to the default browser.
 4. **Team/Compare with several 7B+ local models** is VRAM-bound by design —
